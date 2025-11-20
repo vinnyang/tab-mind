@@ -1,25 +1,29 @@
 {
   "manifest_version": 2,
-  "name": "Local LLM Tab Context",
+  "name": "Local LLM Context",
   "version": "1.0",
-  "description": "Get tab context and generate answers using local LLM",
-  "permissions": [
-    "activeTab",
-    "tabs",
-    "storage"
-  ],
-  "browser_action": {
-    "default_popup": "popup.html",
-    "default_title": "Local LLM Context"
+  "description": "Provides context to local LLMs from browser tabs",
+
+  "permissions": ["activeTab", "tabs", "storage"],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
   },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
     }
   ],
-  "background": {
-    "scripts": ["background.js"],
-    "persistent": false
+
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "Local LLM Context"
+  },
+
+  "icons": {
+    "48": "icon.png"
   }
 }

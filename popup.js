@@ -1,76 +1,163 @@
-// popup script to handle user interaction
+// popup.js - Enhanced with LLM settings and configuration
 document.addEventListener('DOMContentLoaded', () => {
-  const queryInput = document.getElementById('query');
-  const submitButton = document.getElementById('submit');
-  const responseDiv = document.getElementById('response');
-  
-  // Handle form submission
-  submitButton.addEventListener('click', async () => {
-    const query = queryInput.value.trim();
-    
-    if (!query) {
-      responseDiv.textContent = "Please enter a question.";
-      return;
-    }
-    
-    // Show loading state
-    responseDiv.textContent = "Processing...";
-    
+  const refreshButton = document.getElementById('refresh');
+  const queryButton = document.getElementById('query-llm');
+  const promptInput = document.getElementById('prompt-input');
+  const resultDisplay = document.getElementById('result-display');
+  const contextDisplay = document.getElementById('context-display');
+  const loadingIndicator = document.getElementById('loading');
+  const settingsButton = document.getElementById('settings-button');
+  const settingsPanel = document.getElementById('settings-panel');
+  const serviceSelect = document.getElementById('service-select');
+  const endpointInput = document.getElementById('endpoint-input');
+  const modelInput = document.getElementById('model-input');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const saveSettingsButton = document.getElementById('save-settings');
+
+  // Get current tab
+  async function getCurrentTab() {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    return tab;
+  }
+
+  // Refresh context button
+  refreshButton.addEventListener('click', async () => {
     try {
-      // Get page context from background script
-      const response = await chrome.runtime.sendMessage({
-        action: "getTabContext"
+      const tab = await getCurrentTab();
+      const response = await browser.tabs.sendMessage(tab.id, {
+        action: 'getPageContext',
       });
-      
-      if (response.error) {
-        responseDiv.textContent = "Error: " + response.error;
-        return;
+
+      if (response && response.context) {
+        displayContext(response.context);
       }
-      
-      const context = response.context;
-      
-      // In a real implementation, you would send this to your local LLM
-      // For now, we'll simulate a response based on the context
-      
-      const simulatedResponse = generateSimulatedResponse(query, context);
-      responseDiv.textContent = simulatedResponse;
-      
     } catch (error) {
-      console.error("Error:", error);
-      responseDiv.textContent = "Error processing request: " + error.message;
+      console.error('Error refreshing context:', error);
+      contextDisplay.textContent = 'Error: Could not get context';
     }
   });
-  
-  // Generate a simulated response based on context (in real implementation, send to local LLM)
-  function generateSimulatedResponse(query, context) {
-    // This is a placeholder - in a real implementation you would:
-    // 1. Send the context and query to your local LLM API
-    // 2. Receive the response from the LLM
-    // 3. Return that response
-    
-    const lowerQuery = query.toLowerCase();
-    
-    if (lowerQuery.includes("title") || lowerQuery.includes("name")) {
-      return `The page title is: "${context.title}"`;
-    } else if (lowerQuery.includes("url")) {
-      return `The page URL is: ${context.url}`;
-    } else if (lowerQuery.includes("description")) {
-      return `Page description: ${context.description || "No description available"}`;
-    } else if (lowerQuery.includes("heading") || lowerQuery.includes("header")) {
-      if (context.headings.length > 0) {
-        return `Found headings: ${context.headings.map(h => h.text).join(', ')}`;
+
+  // Query LLM button
+  queryButton.addEventListener('click', async () => {
+    const prompt = promptInput.value.trim();
+    if (!prompt) {
+      resultDisplay.textContent = 'Please enter a prompt';
+      return;
+    }
+
+    try {
+      loadingIndicator.style.display = 'block';
+      resultDisplay.textContent = '';
+
+      const tab = await getCurrentTab();
+
+      // Send query to background script
+      const response = await browser.runtime.sendMessage({
+        action: 'queryLLM',
+        tabId: tab.id,
+        prompt: prompt,
+      });
+
+      if (response.success) {
+        resultDisplay.textContent = response.result;
       } else {
-        return "No headings found on this page.";
+        resultDisplay.textContent = `Error: ${response.error}`;
       }
-    } else if (lowerQuery.includes("link") || lowerQuery.includes("url")) {
-      if (context.links.length > 0) {
-        return `Found ${context.links.length} links. First few: ${context.links.slice(0, 3).map(l => l.text).join(', ')}`;
-      } else {
-        return "No links found on this page.";
+    } catch (error) {
+      console.error('LLM query failed:', error);
+      resultDisplay.textContent = `Error: ${error.message}`;
+    } finally {
+      loadingIndicator.style.display = 'none';
+    }
+  });
+
+  // Settings panel toggle
+  settingsButton.addEventListener('click', () => {
+    settingsPanel.style.display =
+      settingsPanel.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Save settings
+  saveSettingsButton.addEventListener('click', async () => {
+    const settings = {
+      service: serviceSelect.value,
+      endpoint: endpointInput.value.trim(),
+      model: modelInput.value.trim(),
+      apiKey: apiKeyInput.value.trim(),
+    };
+
+    try {
+      await browser.runtime.sendMessage({
+        action: 'setLLMSettings',
+        settings: settings,
+      });
+
+      // Show success message
+      const status = document.getElementById('settings-status');
+      status.textContent = 'Settings saved successfully!';
+      status.style.color = 'green';
+
+      // Hide status after 3 seconds
+      setTimeout(() => {
+        status.textContent = '';
+      }, 3000);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      const status = document.getElementById('settings-status');
+      status.textContent = 'Error saving settings';
+      status.style.color = 'red';
+    }
+  });
+
+  // Display context in popup
+  function displayContext(context) {
+    if (!context) return;
+
+    contextDisplay.innerHTML = `
+      <h3>${context.title}</h3>
+      <p><strong>URL:</strong> ${context.url}</p>
+      <p><strong>Domain:</strong> ${context.domain}</p>
+      <p><strong>Text Preview:</strong> ${context.text.substring(0, 200)}...</p>
+      <p><strong>Selection:</strong> ${context.selection || 'None'}</p>
+    `;
+  }
+
+  // Load current settings
+  async function loadSettings() {
+    try {
+      const response = await browser.runtime.sendMessage({
+        action: 'getLLMSettings',
+      });
+      if (response.settings) {
+        const settings = response.settings;
+        serviceSelect.value = settings.service || 'lmstudio';
+        endpointInput.value =
+          settings.endpoint || 'http://localhost:1234/v1/completions';
+        modelInput.value = settings.model || 'llama3';
+        apiKeyInput.value = settings.apiKey || '';
       }
-    } else {
-      // Default response
-      return `I analyzed the page "${context.title}" and found ${context.textContent.length} characters of text. The page URL is ${context.url}. You asked: "${query}"`;
+    } catch (error) {
+      console.error('Error loading settings:', error);
     }
   }
+
+  // Initialize with current context and settings
+  getCurrentTab().then(async (tab) => {
+    try {
+      const response = await browser.tabs.sendMessage(tab.id, {
+        action: 'getPageContext',
+      });
+      if (response && response.context) {
+        displayContext(response.context);
+      }
+    } catch (error) {
+      console.error('Error getting initial context:', error);
+    }
+
+    // Load settings
+    await loadSettings();
+  });
 });
