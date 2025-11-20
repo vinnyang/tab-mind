@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 400px;
+      padding: 10px;
+      font-family: Arial, sans-serif;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #response {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background-color: #f9f9f9;
+      min-height: 50px;
+    }
+  </style>
+</head>
+<body>
+  <h3>Local LLM Context Assistant</h3>
+  <textarea id="query" placeholder="Enter your question about this page..."></textarea>
+  <button id="submit">Get Answer</button>
+  <div id="response">Response will appear here...</div>
+  <script src="popup.js"></script>
+</body>
+</html>
