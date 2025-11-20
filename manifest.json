@@ -3,9 +3,6 @@
   "name": "Local LLM Tab Context",
   "version": "1.0",
   "description": "Get tab context and generate answers using local LLM",
-  "icons": {
-    "48": "icon.png"
-  },
   "permissions": [
     "activeTab",
     "tabs",
