@@ -1,25 +1,98 @@
-// background.js - Enhanced with advanced context processing
-class LLMContextManager {
+// background.js - Enhanced with better error handling
+class TabMindAgent {
   constructor() {
     this.contextCache = new Map();
+    this.llmSettings = {
+      service: 'openai',
+      endpoint: 'localhost:1234',
+      model: '',
+      apiKey: '',
+      models: [],
+    };
     this.loadSettings();
   }
 
   loadSettings() {
     // Load saved settings or use defaults
     browser.storage.local.get(['llmSettings']).then((result) => {
-      this.llmSettings = result.llmSettings || {
-        service: 'lmstudio',
-        endpoint: 'http://localhost:1234/v1/completions',
-        model: 'llama3',
-        apiKey: '',
-      };
+      if (result.llmSettings) {
+        this.llmSettings = result.llmSettings;
+      }
+      console.log('Loaded settings:', this.llmSettings);
+      // Auto-detect models when settings are loaded
+      this.autoDetectModels();
     });
   }
 
   saveSettings(settings) {
     this.llmSettings = settings;
     browser.storage.local.set({ llmSettings: settings });
+  }
+
+  async autoDetectModels() {
+    // Detect models for LM Studio or OpenAI-compatible endpoints
+    const service = this.llmSettings.service;
+    if (service === 'lmstudio' || service === 'openai') {
+      // Normalize endpoint to ensure protocol and remove trailing slash
+      let rawEndpoint = this.llmSettings.endpoint.trim();
+
+      // Add http:// if missing protocol
+      if (!rawEndpoint.match(/^https?:\/\//)) {
+        rawEndpoint = `http://${rawEndpoint}`;
+      }
+
+      let baseUrl = rawEndpoint.replace(/\/$/, '');
+
+      // Remove specific paths if they exist to get base URL
+      baseUrl = baseUrl.replace(/\/v1\/completions$/, '');
+      baseUrl = baseUrl.replace(/\/v1\/chat\/completions$/, '');
+      baseUrl = baseUrl.replace(/\/v1\/models$/, '');
+      baseUrl = baseUrl.replace(/\/models$/, '');
+      baseUrl = baseUrl.replace(/\/v1$/, '');
+
+      // Existing LM Studio detection logic
+      const possibleEndpoints = [`${baseUrl}/v1/models`, `${baseUrl}/models`];
+
+      let detectedModels = [];
+
+      for (const endpoint of possibleEndpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Extract model names from different response formats
+            if (data.data && Array.isArray(data.data)) {
+              detectedModels = data.data.map((m) => m.id);
+            } else if (data.models && Array.isArray(data.models)) {
+              detectedModels = data.models.map((m) => m.id || m.name);
+            } else if (Array.isArray(data)) {
+              detectedModels = data.map((m) => m.id || m.name || m);
+            } else if (data.model) {
+              detectedModels = [data.model];
+            }
+          }
+        } catch {}
+      }
+
+      if (detectedModels.length) {
+        this.llmSettings.models = detectedModels;
+        if (
+          !this.llmSettings.model ||
+          !detectedModels.includes(this.llmSettings.model)
+        ) {
+          this.llmSettings.model = detectedModels[0];
+        }
+      } else {
+        this.llmSettings.models = [];
+      }
+    }
+
+    // Persist updated settings
+    browser.storage.local.set({ llmSettings: this.llmSettings });
+    return this.llmSettings.models;
   }
 
   async getContextForTab(tabId) {
@@ -54,11 +127,36 @@ class LLMContextManager {
 
   async extractPageContext(tab) {
     // Send message to content script to get page context
-    const response = await browser.tabs.sendMessage(tab.id, {
-      action: 'getPageContext',
-    });
+    try {
+      const response = await browser.tabs.sendMessage(tab.id, {
+        action: 'getPageContext',
+      });
 
-    return response;
+      console.log('Received response from content script:', response);
+
+      if (response && response.context) {
+        return response.context;
+      } else if (response && response.error) {
+        throw new Error(`Content script error: ${response.error}`);
+      } else {
+        throw new Error('No context received from content script');
+      }
+    } catch (error) {
+      console.error('Error extracting page context:', error);
+      // Return a minimal context fallback
+      return {
+        url: tab.url,
+        title: tab.title,
+        domain: new URL(tab.url).hostname,
+        text: 'Failed to extract page content',
+        selection: '',
+        headings: [],
+        links: [],
+        images: [],
+        metadata: {},
+        readability: {},
+      };
+    }
   }
 
   processContext(context) {
@@ -125,9 +223,73 @@ class LLMContextManager {
     return summary.join('; ');
   }
 
+  // Clean LLM outputs: remove internal 'thinking' sections and unwanted markers
+  // This follows best practices for handling both thinking and non-thinking model outputs
+  cleanLLMOutput(text) {
+    if (!text || typeof text !== 'string') return text;
+    let out = text;
+
+    // === Remove Anthropic-style thinking blocks ===
+    // Format: <thinking>...</thinking> or variations
+    out = out.replace(/<thinking[\s\S]*?<\/thinking>/gi, '');
+    out = out.replace(/<think[\s\S]*?<\/think>/gi, '');
+    out = out.replace(/\[think\][\s\S]*?\[\/think\]/gi, '');
+    out = out.replace(/<\/?\s*thought[^>]*>/gi, '');
+
+    // === Remove OpenAI-style reasoning blocks ===
+    // Format: <reasoning>...</reasoning>
+    out = out.replace(/<reasoning[\s\S]*?<\/reasoning>/gi, '');
+
+    // === Remove channel/role marker blocks (LM Studio, Ollama variants) ===
+    // Pattern 1: <|channel|>analysis<|message|>...content...<|channel|>message<|message|>
+    // This removes entire analysis/reasoning sections before the message channel
+    out = out.replace(
+      /<\|channel\|>\s*(?:analysis|reasoning|thinking|thought)\s*<\|message\|>[\s\S]*?(?=<\|channel\|>\s*message\s*<\|message\|>|<\|channel\|>\s*user\s*<\|message\|>|$)/gi,
+      ''
+    );
+
+    // Pattern 2: Remove standalone channel markers and their content in sequence
+    // Match: <|channel|>KEYWORD<|message|>...anything...<|message|>
+    out = out.replace(
+      /<\|channel\|>\s*(?:analysis|reasoning|thinking|thought|internal)\s*<\|message\|>[\s\S]*?<\|message\|>/gi,
+      ''
+    );
+
+    // Pattern 3: Remove isolated channel markers
+    out = out.replace(/<\|channel\|>/gi, '');
+    out = out.replace(/<\|message\|>/gi, '');
+    out = out.replace(/<\|endoftext\|>/gi, '');
+    out = out.replace(/<\|start\|>/gi, '');
+    out = out.replace(/<\|end\|>/gi, '');
+
+    // === Remove HTML/XML style comments ===
+    out = out.replace(/<!--[\s\S]*?-->/g, '');
+    out = out.replace(/<!---[\s\S]*?--->/g, '');
+
+    // === Remove template labels often injected by servers ===
+    out = out.replace(/\*\*Final Answer:\*\*/gi, '');
+    out = out.replace(/Final Answer:\s*/gi, '');
+    out = out.replace(/\*\*Answer:\*\*/gi, '');
+    out = out.replace(/^Answer:\s*/gim, '');
+    out = out.replace(/\*\*Response:\*\*/gi, '');
+    out = out.replace(/^Response:\s*/gim, '');
+
+    // === Collapse excessive whitespace ===
+    out = out.replace(/\n{3,}/g, '\n\n');
+    out = out.replace(/^\s+|\s+$/g, '');
+
+    return out.trim();
+  }
+
   async queryLLM(context, prompt) {
     try {
+      // Add debug logging
+      console.log('Context being sent to LLM:', context);
+      console.log('Prompt being sent to LLM:', prompt);
+
       const settings = this.llmSettings;
+
+      console.log('LLM Settings:', settings);
 
       // Different handling based on service type
       switch (settings.service) {
@@ -146,40 +308,206 @@ class LLMContextManager {
     }
   }
 
+  // Parse JSON from LLM response, handling markdown blocks and loose text
+  extractAndParseJSON(text) {
+    if (!text) return null;
+
+    let jsonStr = text;
+
+    // 1. Try to extract from markdown code blocks
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1];
+    } else {
+      // 2. If no code block, try to find the first { and last }
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
+
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = text.substring(firstBrace, lastBrace + 1);
+      }
+    }
+
+    try {
+      // Clean up any potential trailing commas or control characters if needed
+      // (Basic parsing usually handles whitespace)
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn('Failed to parse JSON from LLM response:', e);
+      return null;
+    }
+  }
+
   async queryLMStudio(context, prompt) {
-    const payload = {
-      model: this.llmSettings.model,
-      prompt: `${prompt}\n\nContext:\n${context.text.substring(0, 1000)}`,
-      max_tokens: 500,
-      temperature: 0.7,
-    };
+    return this.queryGenericOpenAI(context, prompt, 'LM Studio');
+  }
 
-    const response = await fetch(this.llmSettings.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+  async queryOpenAI(context, prompt) {
+    return this.queryGenericOpenAI(context, prompt, 'OpenAI');
+  }
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  async queryGenericOpenAI(context, prompt, serviceName) {
+    console.log(`Attempting ${serviceName} query...`);
+
+    // Check if context is valid
+    if (!context || !context.text) {
+      console.error(`Invalid context for ${serviceName} query:`, context);
+      throw new Error('Invalid context - no text available');
     }
 
-    const data = await response.json();
-
-    // LM Studio returns different structure
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].text.trim();
+    // Normalize endpoint URL
+    let rawEndpoint = this.llmSettings.endpoint.trim();
+    if (!rawEndpoint.match(/^https?:\/\//)) {
+      rawEndpoint = `http://${rawEndpoint}`;
     }
 
-    return data.response || 'No response from LLM';
+    let baseUrl = rawEndpoint.replace(/\/$/, '');
+
+    // Remove known subpaths to get base
+    baseUrl = baseUrl.replace(/\/v1\/completions$/, '');
+    baseUrl = baseUrl.replace(/\/v1\/chat\/completions$/, '');
+    baseUrl = baseUrl.replace(/\/v1$/, '');
+
+    // Try different OpenAI-compatible endpoint formats
+    const endpointsToTry = [
+      `${baseUrl}/v1/chat/completions`,
+      `${baseUrl}/v1/completions`,
+    ];
+
+    // Try each endpoint format
+    for (const endpoint of endpointsToTry) {
+      try {
+        console.log(`Trying ${serviceName} endpoint: ${endpoint}`);
+
+        const isChatEndpoint = endpoint.includes('/chat/completions');
+
+        let payload;
+        const systemPrompt =
+          'You are a helpful browser assistant. You must respond with a valid JSON object containing a single field "answer". Example: { "answer": "Your summary here..." }. Ensure the JSON is valid and properly escaped. Do not include any markdown formatting outside the JSON. Do not include thinking or reasoning traces in the JSON output.';
+        const userContent = `${prompt}\n\nContext:\n${context.text.substring(
+          0,
+          1500
+        )}\n\nRemember: Respond ONLY with valid JSON in the format { "answer": "..." }. Escape double quotes inside the answer string.`;
+
+        if (isChatEndpoint) {
+          payload = {
+            model: this.llmSettings.model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userContent },
+            ],
+            max_tokens: 2048,
+            temperature: 0.2,
+            stream: false,
+          };
+        } else {
+          payload = {
+            model: this.llmSettings.model,
+            prompt: `${systemPrompt}\n\n${userContent}`,
+            max_tokens: 2048,
+            temperature: 0.2,
+            stream: false,
+          };
+        }
+
+        // Add API key if present
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (this.llmSettings.apiKey) {
+          headers['Authorization'] = `Bearer ${this.llmSettings.apiKey}`;
+        }
+
+        console.log(`Sending payload to ${serviceName}:`, payload);
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload),
+        });
+
+        console.log(
+          `Response from ${endpoint}:`,
+          response.status,
+          response.statusText
+        );
+
+        if (!response.ok) {
+          console.error(
+            `Endpoint ${endpoint} failed with status: ${response.status}`
+          );
+          console.error('Response body:', await response.text());
+          continue;
+        }
+
+        const data = await response.json();
+        console.log(`Success from ${endpoint}:`, data);
+
+        let rawContent = '';
+
+        // Handle different response formats
+        if (data.choices && data.choices[0]) {
+          rawContent =
+            data.choices[0].text ||
+            (data.choices[0].message && data.choices[0].message.content) ||
+            '';
+        } else if (data.response) {
+          rawContent =
+            typeof data.response === 'string'
+              ? data.response
+              : JSON.stringify(data.response);
+        }
+
+        // 1. Clean "thinking" blocks first
+        const cleanedContent = this.cleanLLMOutput(String(rawContent));
+
+        // 2. Try to parse as JSON
+        const jsonResult = this.extractAndParseJSON(cleanedContent);
+
+        if (jsonResult && jsonResult.answer) {
+          return jsonResult.answer;
+        } else if (jsonResult && jsonResult.content) {
+          return jsonResult.content; // Fallback common field
+        } else if (jsonResult && jsonResult.response) {
+          return jsonResult.response; // Fallback common field
+        } else {
+          // 3. Regex Fallback
+          const answerRegex = /(?:["']?answer["']?)\s*:\s*"((?:[^"\\]|\\.)*)"/s;
+          const match = cleanedContent.match(answerRegex);
+          if (match) {
+            try {
+              return JSON.parse(`"${match[1]}"`);
+            } catch {
+              return match[1];
+            }
+          }
+
+          // Fallback: return cleaned text
+          console.warn(
+            'Could not extract JSON "answer" field, returning cleaned text'
+          );
+          return cleanedContent;
+        }
+      } catch (error) {
+        console.error(`Endpoint ${endpoint} failed with error:`, error);
+        continue;
+      }
+    }
+
+    throw new Error(`All ${serviceName} endpoints failed`);
   }
 
   async queryOllama(context, prompt) {
+    const systemPrompt =
+      'You are a helpful browser assistant. You must respond with a valid JSON object containing a single field "answer". Example: { "answer": "Your summary here..." }. Ensure the JSON is valid and properly escaped. Do not include any markdown formatting outside the JSON. Do not include thinking or reasoning traces in the JSON output.';
+    const userContent = `${prompt}\n\nContext:\n${context.text.substring(
+      0,
+      1500
+    )}\n\nRemember: Respond ONLY with valid JSON in the format { "answer": "..." }. Escape double quotes inside the answer string.`;
+
     const payload = {
       model: this.llmSettings.model,
-      prompt: `${prompt}\n\nContext:\n${context.text.substring(0, 1000)}`,
+      prompt: `${systemPrompt}\n\n${userContent}`,
       stream: false,
     };
 
@@ -196,52 +524,33 @@ class LLMContextManager {
     }
 
     const data = await response.json();
-    return data.response || 'No response from LLM';
-  }
 
-  async queryOpenAI(context, prompt) {
-    const payload = {
-      model: this.llmSettings.model,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a helpful assistant that answers questions based on provided context.',
-        },
-        {
-          role: 'user',
-          content: `${prompt}\n\nContext:\n${context.text.substring(0, 1000)}`,
-        },
-      ],
-      max_tokens: 500,
-      temperature: 0.7,
-    };
+    let rawContent =
+      typeof data.response === 'string'
+        ? data.response
+        : JSON.stringify(data.response) || '';
 
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    // 1. Clean "thinking" blocks first
+    const cleanedContent = this.cleanLLMOutput(String(rawContent));
 
-    if (this.llmSettings.apiKey) {
-      headers['Authorization'] = `Bearer ${this.llmSettings.apiKey}`;
+    // 2. Try to parse as JSON
+    const jsonResult = this.extractAndParseJSON(cleanedContent);
+
+    // 3. Regex Fallback
+    const answerRegex = /(?:["']?answer["']?)\s*:\s*"((?:[^"\\]|\\.)*)"/s;
+    const match = cleanedContent.match(answerRegex);
+    if (match) {
+      try {
+        return JSON.parse(`"${match[1]}"`);
+      } catch {
+        return match[1];
+      }
     }
 
-    const response = await fetch(this.llmSettings.endpoint, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content.trim();
-    }
-
-    return 'No response from LLM';
+    console.warn(
+      'Could not extract JSON "answer" field, returning cleaned text'
+    );
+    return cleanedContent;
   }
 
   async processWithLLM(tabId, userPrompt) {
@@ -260,18 +569,18 @@ class LLMContextManager {
   }
 }
 
-const llmManager = new LLMContextManager();
+const agent = new TabMindAgent();
 
 // Listen for messages from popup/content scripts
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
     case 'getContext':
       return Promise.resolve({
-        context: llmManager.getContextForTab(message.tabId),
+        context: agent.getContextForTab(message.tabId),
       });
 
     case 'queryLLM':
-      llmManager
+      agent
         .processWithLLM(message.tabId, message.prompt)
         .then((result) => sendResponse({ success: true, result }))
         .catch((error) =>
@@ -280,19 +589,30 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // Keep message channel open for async response
 
     case 'getPageContext':
-      llmManager
+      agent
         .extractPageContext(sender.tab)
         .then((context) => sendResponse({ context }))
         .catch((error) => sendResponse({ error: error.message }));
       return true;
 
     case 'getLLMSettings':
-      sendResponse({ settings: llmManager.llmSettings });
+      sendResponse({ settings: agent.llmSettings });
       return true;
 
     case 'setLLMSettings':
-      llmManager.saveSettings(message.settings);
+      agent.saveSettings(message.settings);
+      // Auto-detect models after settings update
+      agent.autoDetectModels();
       sendResponse({ success: true });
+      return true;
+
+    case 'detectModels':
+      agent
+        .autoDetectModels()
+        .then((models) => sendResponse({ success: true, models }))
+        .catch((error) =>
+          sendResponse({ success: false, error: error.message })
+        );
       return true;
   }
 });
@@ -300,7 +620,12 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Listen for tab updates to refresh context
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
-    // Optionally refresh context on page load
     browser.tabs.sendMessage(tabId, { action: 'getPageContext' });
   }
 });
+
+if (browser.browserAction && browser.sidebarAction) {
+  browser.browserAction.onClicked.addListener(() => {
+    browser.sidebarAction.open();
+  });
+}

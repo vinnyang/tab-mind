@@ -1,29 +1,18 @@
 {
   "manifest_version": 2,
-  "name": "Local LLM Context",
+  "name": "TabMind - Browser Agent",
   "version": "1.0",
-  "description": "Provides context to local LLMs from browser tabs",
-
-  "permissions": ["activeTab", "tabs", "storage"],
-
-  "background": {
-    "scripts": ["background.js"],
-    "persistent": false
+  "description": "Provides context to local LLMs from browser tabs with chat interface",
+  "permissions": ["activeTab", "tabs", "storage", "<all_urls>"],
+  "background": { "scripts": ["background.js"], "persistent": false },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"] }],
+  "sidebar_action": {
+    "default_panel": "sidebar.html",
+    "default_title": "TabMind - Browser Agent"
   },
-
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
-    }
-  ],
-
   "browser_action": {
-    "default_popup": "popup.html",
-    "default_title": "Local LLM Context"
+    "default_title": "TabMind - Browser Agent",
+    "default_icon": "icon.png"
   },
-
-  "icons": {
-    "48": "icon.png"
-  }
+  "icons": { "48": "icon.png" }
 }

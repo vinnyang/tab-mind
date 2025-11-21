@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+
+  <body>
+    <div class="sidebar-container" id="sidebar-container">
+      <!-- Resize handle -->
+      <div class="resize-handle" id="resize-handle"></div>
+
+      <div class="sidebar-header">TabMind - Browser Agent</div>
+
+      <div class="model-detection">
+        <label class="model-label">Local Server (Host:Port):</label>
+        <input
+          type="text"
+          id="endpoint-input"
+          class="endpoint-input"
+          placeholder="e.g. localhost:1234"
+        />
+        <label class="model-label"> Select Model: </label>
+        <div class="model-controls">
+          <select id="model-select" class="model-select"></select>
+          <button
+            id="detect-models"
+            class="model-refresh-btn refresh-btn"
+            title="Refresh models"
+          >
+            <span class="icon-refresh"></span>
+          </button>
+        </div>
+        <div id="model-info" class="model-info"></div>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="chat-messages" id="chat-messages">
+          <div class="message assistant-message">
+            Hello! I can help you analyze this page using your local LLM. Try
+            one of the suggestions below or type your own question.
+          </div>
+        </div>
+
+        <div class="context-section">
+          <div class="context-title">
+            Page Context:
+            <div class="context-header-buttons">
+              <button
+                id="toggle-context"
+                class="toggle-context-btn"
+                title="Toggle context visibility"
+              >
+                <span class="icon-chevron"></span>
+              </button>
+              <button
+                id="refresh-button"
+                class="refresh-btn"
+                title="Refresh context"
+              >
+                <span class="icon-refresh"></span>
+              </button>
+            </div>
+          </div>
+          <div class="context-content" id="context-display"></div>
+        </div>
+
+        <div class="suggestions" id="suggestions">
+          <button
+            class="suggestion-btn"
+            data-prompt="Summarize the key takeaways of this page in a concise manner."
+          >
+            Summarize
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="List the main arguments or facts as bullet points."
+          >
+            Key Points
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="Explain the content in simple terms like I'm a beginner."
+          >
+            Simplify
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="Identify any potential biases, logical gaps, or missing perspectives in this content."
+          >
+            Critique
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="Extract actionable steps or practical advice from this text."
+          >
+            Action Items
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="Create a short multiple-choice quiz to test my understanding of this content."
+          >
+            Quiz Me
+          </button>
+          <button
+            class="suggestion-btn"
+            data-prompt="Draft a short social media post (like for Twitter/LinkedIn) summarizing the interesting parts of this page."
+          >
+            Social Post
+          </button>
+        </div>
+
+        <div class="input-area">
+          <textarea
+            id="prompt-input"
+            placeholder="Ask a question about this page..."
+            rows="1"
+          ></textarea>
+          <button id="send-button">Send</button>
+        </div>
+
+        <!-- Hidden by default, added dynamically via JS -->
+        <div id="loading-bubble" class="typing-indicator" style="display: none">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+
+        <!-- Debug info section -->
+        <div class="debug-section">
+          <div class="debug-title">
+            Debug Info:
+            <button
+              id="toggle-debug"
+              class="toggle-context-btn"
+              title="Toggle debug visibility"
+            >
+              <span class="icon-chevron"></span>
+            </button>
+          </div>
+          <div class="debug-content" id="debug-info">
+            <span id="debug-text"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="sidebar.js"></script>
+  </body>
+</html>
