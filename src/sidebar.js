@@ -20,17 +20,58 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleDebugButton: document.getElementById('toggle-debug'),
     debugSection: document.querySelector('.debug-section'),
     resizeHandle: document.getElementById('resize-handle'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsModal: document.getElementById('settings-modal'),
+    closeSettingsBtn: document.getElementById('close-settings'),
+    themeSwitch: document.getElementById('theme-switch')
   };
 
   let modelInfoTimeout = null;
 
+  // --- Theme Logic ---
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (elements.themeSwitch) {
+        // Checkbox checked = Dark (On side), Unchecked = Light (Off side)
+        // If theme is dark, check it. If light, uncheck it.
+        elements.themeSwitch.checked = (theme === 'dark');
+    }
+    // Save theme preference
+    browser.storage.local.set({ theme });
+  }
+
+  // Load theme
+  browser.storage.local.get(['theme']).then((result) => {
+    setTheme(result.theme || 'dark');
+  });
+
+  if (elements.themeSwitch) {
+      elements.themeSwitch.addEventListener('change', (e) => {
+          const newTheme = e.target.checked ? 'dark' : 'light';
+          setTheme(newTheme);
+      });
+  }
+
+  // --- Modal Logic ---
+  elements.settingsBtn.addEventListener('click', () => {
+    elements.settingsModal.classList.remove('hidden');
+  });
+
+  elements.closeSettingsBtn.addEventListener('click', () => {
+    elements.settingsModal.classList.add('hidden');
+  });
+
+  // Close on click outside
+  elements.settingsModal.addEventListener('click', (e) => {
+    if (e.target === elements.settingsModal) {
+      elements.settingsModal.classList.add('hidden');
+    }
+  });
+
   // --- Core Logic ---
 
   async function getCurrentTab() {
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     return tab;
   }
 
@@ -59,64 +100,41 @@ document.addEventListener('DOMContentLoaded', () => {
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
 
     // Headings
-    text = text
-      .replace(/^######\s*(.*)$/gm, '<h6>$1</h6>')
-      .replace(/^#####\s*(.*)$/gm, '<h5>$1</h5>')
-      .replace(/^####\s*(.*)$/gm, '<h4>$1</h4>')
-      .replace(/^###\s*(.*)$/gm, '<h3>$1</h3>')
-      .replace(/^##\s*(.*)$/gm, '<h2>$1</h2>')
-      .replace(/^#\s*(.*)$/gm, '<h1>$1</h1>');
+    text = text.replace(/^######\s*(.*)$/gm, '<h6>$1</h6>')
+               .replace(/^#####\s*(.*)$/gm, '<h5>$1</h5>')
+               .replace(/^####\s*(.*)$/gm, '<h4>$1</h4>')
+               .replace(/^###\s*(.*)$/gm, '<h3>$1</h3>')
+               .replace(/^##\s*(.*)$/gm, '<h2>$1</h2>')
+               .replace(/^#\s*(.*)$/gm, '<h1>$1</h1>');
 
     // Formatting
-    text = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+               .replace(/\*(.*?)\*/g, '<em>$1</em>');
 
     // Links
-    text = text.replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      (m, label, url) =>
-        `<a href="${url.replace(
-          /"/g,
-          '%22'
-        )}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) =>
+      `<a href="${url.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer">${label}</a>`
     );
 
     // Lists
-    text = text.replace(
-      /(^|\n)([ \t]*[-\*+]\s+.+(\n|$))+/g,
-      (m) =>
-        `\n<ul>${m
-          .trim()
-          .split(/\n/)
-          .map((l) => `<li>${l.replace(/^[ \t]*[-\*+]\s+/, '')}</li>`)
-          .join('')}</ul>\n`
+    text = text.replace(/(^|\n)([ \t]*[-\*+]\s+.+(\n|$))+/g, m =>
+      `\n<ul>${m.trim().split(/\n/).map(l => `<li>${l.replace(/^[ \t]*[-\*+]\s+/, '')}</li>`).join('')}</ul>\n`
     );
-    text = text.replace(
-      /(^|\n)([ \t]*\d+\.\s+.+(\n|$))+/g,
-      (m) =>
-        `\n<ol>${m
-          .trim()
-          .split(/\n/)
-          .map((l) => `<li>${l.replace(/^[ \t]*\d+\.\s+/, '')}</li>`)
-          .join('')}</ol>\n`
+    text = text.replace(/(^|\n)([ \t]*\d+\.\s+.+(\n|$))+/g, m =>
+      `\n<ol>${m.trim().split(/\n/).map(l => `<li>${l.replace(/^[ \t]*\d+\.\s+/, '')}</li>`).join('')}</ol>\n`
     );
 
     // Paragraphs
-    const blocks = text.split(/\n{2,}/).map((b) => b.trim());
-    return blocks
-      .map((b) => {
-        if (/^<h[1-6]>|^<ul>|^<ol>|^<pre>/.test(b)) return b;
-        return `<p>${b.replace(/\n/g, '<br>')}</p>`;
-      })
-      .join('\n');
+    const blocks = text.split(/\n{2,}/).map(b => b.trim());
+    return blocks.map(b => {
+      if (/^<h[1-6]>|^<ul>|^<ol>|^<pre>/.test(b)) return b;
+      return `<p>${b.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
   }
 
   function addMessage(text, isUser = false) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${
-      isUser ? 'user-message' : 'assistant-message'
-    }`;
+    messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
 
     if (isUser) {
       messageDiv.textContent = text;
@@ -132,16 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       elements.chatMessages.innerHTML = '';
       const tab = await getCurrentTab();
-      const response = await browser.tabs.sendMessage(tab.id, {
-        action: 'getPageContext',
-      });
+      const response = await browser.tabs.sendMessage(tab.id, { action: 'getPageContext' });
 
       if (response && response.context) {
         displayContext(response.context);
-        addMessage(
-          `Page context refreshed from: ${response.context.title}`,
-          false
-        );
+        addMessage(`Page context refreshed from: ${response.context.title}`, false);
         return response.context;
       } else {
         addMessage('Error: Could not get context', false);
@@ -149,7 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       console.error('Error refreshing context:', error);
-      addMessage('Error: Could not get context', false);
+      if (error.message && error.message.includes('Receiving end does not exist')) {
+        addMessage('Connection error: Please refresh the web page and try again.', false);
+      } else {
+        addMessage('Error: Could not get context', false);
+      }
       return null;
     }
   }
@@ -198,9 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Don't change button text, keep it as 'Send'
     // elements.sendButton.textContent = isLoading ? 'Processing...' : 'Send';
 
-    const suggestionButtons =
-      elements.suggestionsContainer.querySelectorAll('.suggestion-btn');
-    suggestionButtons.forEach((btn) => (btn.disabled = isLoading));
+    const suggestionButtons = elements.suggestionsContainer.querySelectorAll('.suggestion-btn');
+    suggestionButtons.forEach(btn => btn.disabled = isLoading);
 
     // Manage typing bubble
     let bubble = document.getElementById('typing-bubble');
@@ -236,16 +252,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function updateSettings(newSettings) {
-    await browser.runtime.sendMessage({
-      action: 'setLLMSettings',
-      settings: newSettings,
-    });
+    await browser.runtime.sendMessage({ action: 'setLLMSettings', settings: newSettings });
   }
 
   async function getSettings() {
-    const resp = await browser.runtime.sendMessage({
-      action: 'getLLMSettings',
-    });
+    const resp = await browser.runtime.sendMessage({ action: 'getLLMSettings' });
     return resp.settings;
   }
 
@@ -269,9 +280,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   elements.suggestionsContainer.addEventListener('click', (e) => {
     if (e.target.classList.contains('suggestion-btn')) {
-      elements.promptInput.value = e.target.getAttribute('data-prompt');
-      elements.promptInput.focus();
-      elements.sendButton.click();
+      const template = e.target.getAttribute('data-template');
+      if (template) {
+        // For dynamic templates (like translate), populate input and focus for user to complete
+        elements.promptInput.value = template;
+        elements.promptInput.focus();
+
+        // Highlight the placeholder if possible
+        const bracketIndex = template.indexOf('[');
+        if (bracketIndex !== -1) {
+            elements.promptInput.setSelectionRange(bracketIndex, template.indexOf(']') + 1);
+        }
+      } else {
+        // For standard prompts, send immediately
+        elements.promptInput.value = e.target.getAttribute('data-prompt');
+        elements.promptInput.focus();
+        elements.sendButton.click();
+      }
     }
   });
 
@@ -300,15 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (modelInfoTimeout) clearTimeout(modelInfoTimeout);
       elements.modelInfo.textContent = 'Detecting models...';
 
-      const response = await browser.runtime.sendMessage({
-        action: 'detectModels',
-      });
+      const response = await browser.runtime.sendMessage({ action: 'detectModels' });
 
       if (response.success) {
         const models = response.models;
-        elements.modelInfo.textContent = models.length
-          ? `Detected models: ${models.join(', ')}`
-          : 'No model found';
+        elements.modelInfo.textContent = models.length ? `Detected models: ${models.join(', ')}` : 'No model found';
 
         const settings = await getSettings();
         const selected = settings.model || (models[0] ?? '');
@@ -355,6 +376,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Legacy section commented out as moved to modal
+  /*
+  if (elements.toggleModelConfigButton) {
+    // Start expanded by default, so add expanded class initially if not hidden
+    if (!elements.modelDetectionSection.classList.contains('hidden')) {
+        elements.toggleModelConfigButton.classList.add('expanded');
+    }
+
+    elements.toggleModelConfigButton.addEventListener('click', () => {
+      toggleSection(elements.toggleModelConfigButton, elements.modelDetectionSection);
+    });
+  }
+  */
+
   // Auto-resize textarea
   elements.promptInput.addEventListener('input', function () {
     this.style.height = 'auto';
@@ -377,8 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
   getSettings().then((settings) => {
     if (settings) {
       if (settings.models) populateModelSelect(settings.models, settings.model);
-      if (elements.endpointInput && settings.endpoint)
-        elements.endpointInput.value = settings.endpoint;
+      if (elements.endpointInput && settings.endpoint) elements.endpointInput.value = settings.endpoint;
 
       // Show debug info
       elements.debugText.textContent = `Service: ${settings.service}\nEndpoint: ${settings.endpoint}\nModel: ${settings.model}`;
@@ -386,11 +420,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Default visibility states
-  elements.contextSection.classList.add('hidden');
+  // elements.contextSection.classList.add('hidden'); // Already added in HTML
   if (elements.debugSection) {
     elements.debugSection.classList.add('hidden');
-    if (elements.toggleDebugButton)
-      elements.toggleDebugButton.classList.remove('expanded');
+    if (elements.toggleDebugButton) elements.toggleDebugButton.classList.remove('expanded');
   }
 
   // Initial context refresh
@@ -403,10 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.resizeHandle.addEventListener('mousedown', (e) => {
     isResizing = true;
     startX = e.clientX;
-    startWidth = parseInt(
-      window.getComputedStyle(elements.sidebarContainer).width,
-      10
-    );
+    startWidth = parseInt(window.getComputedStyle(elements.sidebarContainer).width, 10);
     document.body.style.cursor = 'col-resize';
     e.preventDefault();
   });
@@ -416,10 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newWidth = startWidth + (e.clientX - startX);
     if (newWidth >= 300 && newWidth <= 600) {
       elements.sidebarContainer.style.width = `${newWidth}px`;
-      document.documentElement.style.setProperty(
-        '--sidebar-width',
-        `${newWidth}px`
-      );
+      document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
     }
   });
 
@@ -429,21 +456,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function updateSidebarWidth() {
-    const width =
-      window.innerWidth < 768
-        ? '100%'
-        : Math.min(400, Math.min(600, window.innerWidth * 0.7)) + 'px';
+    const width = window.innerWidth < 768 ? '100%' : Math.min(400, Math.min(600, window.innerWidth * 0.7)) + 'px';
     elements.sidebarContainer.style.width = width;
     document.documentElement.style.setProperty('--sidebar-width', width);
   }
 
   window.addEventListener('resize', () => {
     if (parseInt(elements.sidebarContainer.style.width) > 600) {
-      elements.sidebarContainer.style.width = '600px';
-      document.documentElement.style.setProperty('--sidebar-width', '600px');
+        elements.sidebarContainer.style.width = '600px';
+        document.documentElement.style.setProperty('--sidebar-width', '600px');
     }
     updateSidebarWidth();
   });
 
   updateSidebarWidth();
 });
+

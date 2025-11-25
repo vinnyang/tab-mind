@@ -1,151 +1,141 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="sidebar.css" />
-  </head>
 
-  <body>
-    <div class="sidebar-container" id="sidebar-container">
-      <!-- Resize handle -->
-      <div class="resize-handle" id="resize-handle"></div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="sidebar.css" />
+</head>
 
-      <div class="sidebar-header">TabMind - Browser Agent</div>
+<body>
+  <div class="sidebar-container" id="sidebar-container">
+    <!-- Resize handle -->
+    <div class="resize-handle" id="resize-handle"></div>
 
-      <div class="model-detection">
-        <label class="model-label">Local Server (Host:Port):</label>
-        <input
-          type="text"
-          id="endpoint-input"
-          class="endpoint-input"
-          placeholder="e.g. localhost:1234"
-        />
-        <label class="model-label"> Select Model: </label>
-        <div class="model-controls">
-          <select id="model-select" class="model-select"></select>
-          <button
-            id="detect-models"
-            class="model-refresh-btn refresh-btn"
-            title="Refresh models"
-          >
-            <span class="icon-refresh"></span>
-          </button>
-        </div>
-        <div id="model-info" class="model-info"></div>
-      </div>
+    <div class="sidebar-header">
+      TabMind - Browser Agent
+      <button id="settings-btn" class="settings-btn" title="Settings">
+        <span class="icon-gear-new">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+          </svg>
+        </span>
+      </button>
+    </div>
 
-      <div class="sidebar-content">
-        <div class="chat-messages" id="chat-messages">
-          <div class="message assistant-message">
-            Hello! I can help you analyze this page using your local LLM. Try
-            one of the suggestions below or type your own question.
-          </div>
+    <!-- Config Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button id="close-settings" class="close-btn">&times;</button>
         </div>
 
-        <div class="context-section">
-          <div class="context-title">
-            Page Context:
-            <div class="context-header-buttons">
-              <button
-                id="toggle-context"
-                class="toggle-context-btn"
-                title="Toggle context visibility"
-              >
-                <span class="icon-chevron"></span>
-              </button>
-              <button
-                id="refresh-button"
-                class="refresh-btn"
-                title="Refresh context"
-              >
-                <span class="icon-refresh"></span>
-              </button>
+        <div class="modal-body">
+          <div class="setting-group">
+            <div class="setting-row">
+              <label class="setting-label">Dark Mode</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="theme-switch" checked>
+                <span class="slider round"></span>
+              </label>
             </div>
           </div>
-          <div class="context-content" id="context-display"></div>
-        </div>
 
-        <div class="suggestions" id="suggestions">
-          <button
-            class="suggestion-btn"
-            data-prompt="Summarize the key takeaways of this page in a concise manner."
-          >
-            Summarize
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="List the main arguments or facts as bullet points."
-          >
-            Key Points
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="Explain the content in simple terms like I'm a beginner."
-          >
-            Simplify
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="Identify any potential biases, logical gaps, or missing perspectives in this content."
-          >
-            Critique
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="Extract actionable steps or practical advice from this text."
-          >
-            Action Items
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="Create a short multiple-choice quiz to test my understanding of this content."
-          >
-            Quiz Me
-          </button>
-          <button
-            class="suggestion-btn"
-            data-prompt="Draft a short social media post (like for Twitter/LinkedIn) summarizing the interesting parts of this page."
-          >
-            Social Post
-          </button>
-        </div>
-
-        <div class="input-area">
-          <textarea
-            id="prompt-input"
-            placeholder="Ask a question about this page..."
-            rows="1"
-          ></textarea>
-          <button id="send-button">Send</button>
-        </div>
-
-        <!-- Hidden by default, added dynamically via JS -->
-        <div id="loading-bubble" class="typing-indicator" style="display: none">
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-        </div>
-
-        <!-- Debug info section -->
-        <div class="debug-section">
-          <div class="debug-title">
-            Debug Info:
-            <button
-              id="toggle-debug"
-              class="toggle-context-btn"
-              title="Toggle debug visibility"
-            >
-              <span class="icon-chevron"></span>
+          <div class="setting-group">
+            <label class="setting-label">Local Server (Host:Port)</label>
+            <input type="text" id="endpoint-input" class="endpoint-input" placeholder="e.g. localhost:1234" />
+            <label class="setting-label">Detect Models</label>
+            <button id="detect-models" class="model-refresh-btn refresh-btn" title="Refresh models">
+              <span class="icon-refresh"></span> Refresh models
             </button>
+            <div id="model-info" class="model-info"></div>
           </div>
-          <div class="debug-content" id="debug-info">
-            <span id="debug-text"></span>
+
+          <div class="setting-group">
+            <label class="setting-label">Debug Info</label>
+            <div class="debug-content" id="debug-info">
+              <span id="debug-text"></span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <script src="sidebar.js"></script>
-  </body>
+    <div class="model-selection-area">
+      <label class="model-label">Select Model:</label>
+      <select id="model-select" class="model-select"></select>
+    </div>
+
+    <div class="sidebar-content">
+      <div class="chat-messages" id="chat-messages">
+        <div class="message assistant-message">
+          Hello! I can help you analyze this page using your local LLM. Try
+          one of the suggestions below or type your own question.
+        </div>
+      </div>
+
+      <div class="context-section hidden">
+        <div class="context-title">
+          Page Context:
+          <div class="context-header-buttons">
+            <button id="toggle-context" class="toggle-context-btn" title="Toggle context visibility">
+              <span class="icon-chevron"></span>
+            </button>
+            <button id="refresh-button" class="refresh-btn" title="Refresh context">
+              <span class="icon-refresh"></span>
+            </button>
+          </div>
+        </div>
+        <div class="context-content" id="context-display"></div>
+      </div>
+
+      <div class="suggestions" id="suggestions">
+        <button class="suggestion-btn" data-prompt="Summarize the key takeaways of this page in a concise manner.">
+          Summarize
+        </button>
+        <button class="suggestion-btn" data-prompt="List the main arguments or facts as bullet points.">
+          Key Points
+        </button>
+        <button class="suggestion-btn" data-prompt="Explain the content in simple terms like I'm a beginner.">
+          Simplify
+        </button>
+        <button class="suggestion-btn"
+          data-prompt="Identify any potential biases, logical gaps, or missing perspectives in this content.">
+          Critique
+        </button>
+        <button class="suggestion-btn" data-prompt="Extract actionable steps or practical advice from this text.">
+          Action Items
+        </button>
+        <button class="suggestion-btn"
+          data-prompt="Create a short multiple-choice quiz to test my understanding of this content.">
+          Quiz Me
+        </button>
+        <button class="suggestion-btn"
+          data-prompt="Draft a short social media post (like for Twitter/LinkedIn) summarizing the interesting parts of this page.">
+          Social Post
+        </button>
+        <button class="suggestion-btn dynamic-btn" data-template="Translate this page into [LANGUAGE].">
+          Translate to...
+        </button>
+      </div>
+
+      <div class="input-area">
+        <textarea id="prompt-input" placeholder="Ask a question about this page..." rows="1"></textarea>
+        <button id="send-button">Send</button>
+      </div>
+
+      <!-- Hidden by default, added dynamically via JS -->
+      <div id="loading-bubble" class="typing-indicator" style="display: none;">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="dist/sidebar.js" type="module"></script>
+</body>
+
 </html>

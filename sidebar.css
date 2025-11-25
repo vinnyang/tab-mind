@@ -26,6 +26,24 @@
   --transition-speed: 0.2s;
 }
 
+[data-theme="light"] {
+  /* Tokyo Night Light Theme Colors */
+  --primary-color: #34548a; /* Darker Blue */
+  --primary-dark: #0f4b6e;
+  --secondary-color: #e1e2e7; /* Light Gray Background */
+  --secondary-hover: #cfc9c2; /* Slightly darker gray */
+
+  --text-dark: #343b58; /* Dark Blue-Gray text */
+  --text-light: #565a6e; /* Muted Gray text */
+
+  --border-color: #9aa5ce;
+  --background-color: #d5d6db; /* Main Light Background */
+
+  --error-text: #8c4351;
+  --error-bg: rgba(247, 118, 142, 0.1);
+  --error-border: #8c4351;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -71,6 +89,253 @@ body {
   font-weight: bold;
   position: relative;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: center; /* Center title */
+  align-items: center;
+}
+
+.settings-btn {
+  position: absolute;
+  right: 15px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-btn:hover {
+  opacity: 0.8;
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background-color: var(--background-color);
+  width: 90%;
+  max-width: 400px;
+  border-radius: var(--panel-radius);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  border: 1px solid var(--border-color);
+}
+
+.modal-header {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-dark);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 5px;
+}
+
+.close-btn:hover {
+  color: var(--primary-color);
+}
+
+.modal-body {
+  padding: 15px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-label {
+  font-weight: bold;
+  color: var(--primary-color);
+  font-size: 14px;
+}
+
+.theme-toggle {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: var(--btn-radius);
+  overflow: hidden;
+}
+
+.theme-btn {
+  flex: 1;
+  background-color: var(--secondary-color);
+  color: var(--text-light);
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+.theme-btn.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.model-selection-area {
+  padding: 10px 15px;
+  background-color: var(--secondary-color);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.model-selection-area .model-label {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.icon-gear {
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 100%;
+}
+
+.icon-gear::before,
+.icon-gear::after {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  position: absolute;
+  width: 22px;
+  height: 4px;
+  background: currentColor;
+  left: -4px;
+  top: 5px;
+  border-radius: 2px;
+}
+
+.icon-gear::after {
+  transform: rotate(90deg);
+}
+
+/* Better Gear Icon - More detailed */
+.icon-gear-new {
+  width: 18px;
+  height: 18px;
+  position: relative;
+  display: block;
+}
+
+.icon-gear-new svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-color);
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--primary-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+/* Model detection legacy override/cleanup in Modal */
+.modal-body .model-refresh-btn {
+  width: auto; /* Allow full width/auto width button in modal */
+  padding: 0 10px;
+  margin-top: 5px;
 }
 
 .sidebar-content {
@@ -115,10 +380,10 @@ body {
 
 .context-section,
 .debug-section,
-.model-detection {
+.model-detection-section {
   background-color: var(--secondary-color);
   padding: 10px 15px;
-  font-size: 12px;
+  font-size: 14px;
   border-radius: var(--panel-radius);
 }
 
@@ -129,18 +394,33 @@ body {
 }
 
 .context-section.hidden .context-content,
-.debug-section.hidden .debug-content {
+.context-section.hidden .debug-section,
+.debug-section.hidden .debug-content,
+.model-detection-section.hidden .model-detection-content {
   display: none;
 }
 
 .context-title,
-.debug-title {
+.debug-title,
+.model-detection-title {
   font-weight: bold;
   margin-bottom: 5px;
   color: var(--primary-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.model-detection-title {
+  margin-bottom: 0; /* Override since it's in a flex container usually */
+  flex: 1;
+}
+
+.model-detection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
 }
 
 .context-header-buttons,
@@ -159,14 +439,14 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--btn-radius);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   vertical-align: middle;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  width: 28px;
+  height: 30px; /* Increased height slightly for larger icon */
+  width: 30px;  /* Increased width slightly */
   padding: 0;
   transition: background-color var(--transition-speed);
 }
@@ -202,7 +482,7 @@ body {
   border-radius: 20px;
   resize: none;
   height: 40px;
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   background-color: var(--secondary-color);
   color: var(--text-dark);
@@ -238,7 +518,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 15px;
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
   color: var(--text-dark);
@@ -273,28 +553,13 @@ body {
   animation: typing 1.4s infinite ease-in-out both;
 }
 
-.typing-dot:nth-child(1) {
-  animation-delay: 0s;
-}
-.typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes typing {
-  0%,
-  80%,
-  100% {
-    transform: scale(0.6);
-    opacity: 0.6;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-    background-color: var(--primary-color);
-  }
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.6; }
+  40% { transform: scale(1); opacity: 1; background-color: var(--primary-color); }
 }
 
 .loading {
@@ -315,15 +580,21 @@ body {
   margin: 10px 15px;
 }
 
-.model-detection {
+.model-detection-section {
   margin-top: 10px;
   display: flex;
   flex-direction: column;
+}
+
+.model-detection-content {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  margin-top: 5px;
 }
 
 .model-label {
-  font-size: 11px;
+  font-size: 13px;
   display: block;
   margin-bottom: 0;
   color: var(--text-dark);
@@ -337,7 +608,7 @@ body {
   color: var(--text-dark);
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .endpoint-input:focus {
@@ -347,14 +618,16 @@ body {
 
 .model-select {
   flex: 1;
-  font-size: 11px;
+  font-size: 15px;
   background-color: var(--secondary-color);
   color: var(--text-dark);
   border: 1px solid var(--border-color);
+  height: 36px;
+  padding: 0 10px;
 }
 
 .model-info {
-  font-size: 11px;
+  font-size: 13px;
   min-height: 16px;
   color: var(--text-light);
 }
@@ -412,36 +685,47 @@ body {
   border-width: 0 2px 2px 0;
   display: inline-block;
   padding: 3px;
-  transform: rotate(-135deg); /* Up by default (Hidden state) */
+  transform: rotate(-135deg); /* Pointing UP (Collapsed state for content below) or RIGHT */
   transition: transform 0.3s;
-  margin-bottom: -2px;
-  margin-top: 2px;
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+/* State: Section is HIDDEN (Collapsed) -> Arrow points LEFT or RIGHT?
+   Standard accordion: Point RIGHT when collapsed, DOWN when expanded.
+   Or UP when collapsed (if it pops up), DOWN when expanded.
+*/
+
+/* Let's try standard accordion: Right (collapsed) -> Down (expanded) */
+.icon-chevron {
+  transform: rotate(-45deg); /* Right */
+  margin-left: -2px;
 }
 
 .toggle-context-btn.expanded .icon-chevron {
-  transform: rotate(45deg); /* Down when expanded (Visible state) */
+  transform: rotate(45deg); /* Down */
+  margin-left: 0;
   margin-top: -2px;
-  margin-bottom: 2px;
 }
 
 .icon-refresh {
   box-sizing: border-box;
   position: relative;
   display: block;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border: 2px solid currentColor;
   border-radius: 100%;
   border-top-color: transparent;
 }
 
 .icon-refresh::before {
-  content: '';
+  content: "";
   display: block;
   box-sizing: border-box;
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-top: 2px solid currentColor;
   border-right: 2px solid currentColor;
   top: -2px;

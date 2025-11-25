@@ -1,3 +1,4 @@
+// content.js - Enhanced with sophisticated context extraction
 function extractPageContext() {
   const context = {
     url: window.location.href,
@@ -99,8 +100,7 @@ function extractReadableText() {
     }
 
     // Fallback to body if no specific content area found or it's too small
-    const targetElement =
-      bestContent && maxTextLength > 200 ? bestContent : bodyClone;
+    const targetElement = (bestContent && maxTextLength > 200) ? bestContent : bodyClone;
 
     // Convert DOM to Markdown-like text
     return domToMarkdown(targetElement).substring(0, 15000); // Increased limit to 15KB
@@ -133,7 +133,7 @@ function domToMarkdown(node) {
 
     // Process children first
     let childrenText = '';
-    node.childNodes.forEach((child) => {
+    node.childNodes.forEach(child => {
       childrenText += domToMarkdown(child);
     });
 

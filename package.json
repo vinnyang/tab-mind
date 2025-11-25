@@ -1,0 +1,17 @@
+{
+  "name": "tab-mind",
+  "version": "1.0.0",
+  "description": "TabMind Browser Agent with LangGraph.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.18",
+    "@langchain/langgraph": "^0.2.23",
+    "async_hooks": "^1.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}
