@@ -1,4 +1,3 @@
-// content.js - Enhanced with sophisticated context extraction
 function extractPageContext() {
   const context = {
     url: window.location.href,
@@ -13,22 +12,11 @@ function extractPageContext() {
     readability: {},
   };
 
-  // Extract structured content with better filtering
   context.text = extractReadableText();
-
-  // Extract metadata
   context.metadata = extractMetadata();
-
-  // Extract headings with hierarchy
   context.headings = extractHeadings();
-
-  // Extract links with more context
   context.links = extractLinks();
-
-  // Extract images with better information
   context.images = extractImages();
-
-  // Calculate readability metrics
   context.readability = calculateReadability(context.text);
 
   return context;
@@ -36,10 +24,8 @@ function extractPageContext() {
 
 function extractReadableText() {
   try {
-    // Remove script and style elements
     const bodyClone = document.body.cloneNode(true);
 
-    // Remove unwanted elements
     const unwantedSelectors = [
       'script',
       'style',
@@ -64,7 +50,6 @@ function extractReadableText() {
       elements.forEach((el) => el.remove());
     });
 
-    // Extract text from main content areas
     const mainContentSelectors = [
       'main',
       'article',
@@ -81,13 +66,10 @@ function extractReadableText() {
     let bestContent = null;
     let maxTextLength = 0;
 
-    // Try to find the main content area
     for (const selector of mainContentSelectors) {
       const elements = bodyClone.querySelectorAll(selector);
       if (elements.length > 0) {
-        // Get the element with most text content
         for (const element of elements) {
-          // Simple heuristic: text length of direct visible text
           const textLength = element.textContent.trim().length;
           if (textLength > maxTextLength) {
             maxTextLength = textLength;
@@ -97,22 +79,19 @@ function extractReadableText() {
       }
     }
 
-    // Fallback to body if no specific content area found or it's too small
-    const targetElement = (bestContent && maxTextLength > 200) ? bestContent : bodyClone;
+    const targetElement =
+      bestContent && maxTextLength > 200 ? bestContent : bodyClone;
 
-    // Convert DOM to Markdown-like text
-    return domToMarkdown(targetElement).substring(0, 15000); // Increased limit to 15KB
+    return domToMarkdown(targetElement).substring(0, 15000);
   } catch (error) {
     console.error('Error extracting readable text:', error);
     return 'Failed to extract page content';
   }
 }
 
-// Helper to convert DOM to simple Markdown
 function domToMarkdown(node) {
   let text = '';
 
-  // Skip hidden elements
   if (node.nodeType === Node.ELEMENT_NODE) {
     const style = window.getComputedStyle(node);
     if (style.display === 'none' || style.visibility === 'hidden') {
@@ -120,18 +99,15 @@ function domToMarkdown(node) {
     }
   }
 
-  // Handle text nodes
   if (node.nodeType === Node.TEXT_NODE) {
     return node.textContent.replace(/\s+/g, ' ');
   }
 
-  // Handle specific elements
   if (node.nodeType === Node.ELEMENT_NODE) {
     const tagName = node.tagName.toLowerCase();
 
-    // Process children first
     let childrenText = '';
-    node.childNodes.forEach(child => {
+    node.childNodes.forEach((child) => {
       childrenText += domToMarkdown(child);
     });
 
@@ -186,7 +162,6 @@ function extractMetadata() {
   const metadata = {};
 
   try {
-    // Extract meta tags
     const metaTags = document.querySelectorAll('meta');
     metaTags.forEach((tag) => {
       const name = tag.getAttribute('name') || tag.getAttribute('property');
@@ -196,7 +171,6 @@ function extractMetadata() {
       }
     });
 
-    // Extract Open Graph data
     const ogData = {};
     const ogTags = document.querySelectorAll('meta[property^="og:"]');
     ogTags.forEach((tag) => {
@@ -207,7 +181,6 @@ function extractMetadata() {
       }
     });
 
-    // Extract Twitter Card data
     const twitterData = {};
     const twitterTags = document.querySelectorAll('meta[name^="twitter:"]');
     twitterTags.forEach((tag) => {
@@ -243,7 +216,6 @@ function extractHeadings() {
     const headingElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
 
     headingElements.forEach((heading, index) => {
-      // Get the text content and clean it
       const text = heading.textContent.trim();
       if (text.length > 0) {
         headings.push({
@@ -270,7 +242,6 @@ function extractLinks() {
     const links = [];
     const linkElements = document.querySelectorAll('a[href]');
 
-    // Get top 20 links with meaningful text
     const validLinks = Array.from(linkElements)
       .filter((link) => {
         const text = link.textContent.trim();
@@ -287,7 +258,6 @@ function extractLinks() {
       const text = link.textContent.trim().substring(0, 100);
       const url = link.href;
 
-      // Try to get the title attribute if available
       const title = link.title || '';
 
       links.push({
@@ -313,15 +283,14 @@ function extractImages() {
     const images = [];
     const imageElements = document.querySelectorAll('img[src]');
 
-    // Get top 10 images with meaningful alt text
     const validImages = Array.from(imageElements)
       .filter((img) => {
         return (
           img.src &&
           (img.alt || img.title) &&
-          !img.src.includes('data:image') && // Skip base64 images
+          !img.src.includes('data:image') &&
           img.naturalWidth > 10
-        ); // Skip very small images
+        );
       })
       .slice(0, 10);
 
@@ -353,7 +322,6 @@ function calculateReadability(text) {
     const words = text.split(/\s+/).filter((w) => w.length > 0);
     const characters = text.replace(/\s/g, '').length;
 
-    // Calculate readability metrics
     const avgWordsPerSentence =
       sentences.length > 0 ? words.length / sentences.length : 0;
     const avgCharactersPerWord =
@@ -383,7 +351,7 @@ function calculateFleschReadingEase(wordCount, sentenceCount, characterCount) {
 
     const avgWordsPerSentence = wordCount / sentenceCount;
     const avgSyllablesPerWord =
-      characterCount > 0 ? (characterCount / wordCount) * 0.5 : 0; // Simplified syllable calculation
+      characterCount > 0 ? (characterCount / wordCount) * 0.5 : 0;
 
     const score =
       206.835 - 1.015 * avgWordsPerSentence - 84.6 * avgSyllablesPerWord;
@@ -394,36 +362,31 @@ function calculateFleschReadingEase(wordCount, sentenceCount, characterCount) {
   }
 }
 
-// Listen for text selection changes
 let selectionTimeout;
 document.addEventListener('selectionchange', () => {
   if (selectionTimeout) clearTimeout(selectionTimeout);
   selectionTimeout = setTimeout(() => {
     const selection = window.getSelection().toString();
     if (selection) {
-       try {
-         // Send update message to runtime (received by sidebar/background)
-         browser.runtime.sendMessage({
-           action: 'selectionChanged',
-           selectionLength: selection.length,
-           hasSelection: selection.length > 0
-         });
-       } catch (e) {
-         // Ignore errors if extension context is invalidated
-       }
+      try {
+        browser.runtime.sendMessage({
+          action: 'selectionChanged',
+          selectionLength: selection.length,
+          hasSelection: selection.length > 0,
+        });
+      } catch (e) {}
     } else {
-       try {
-         browser.runtime.sendMessage({
-           action: 'selectionChanged',
-           selectionLength: 0,
-           hasSelection: false
-         });
-       } catch (e) {}
+      try {
+        browser.runtime.sendMessage({
+          action: 'selectionChanged',
+          selectionLength: 0,
+          hasSelection: false,
+        });
+      } catch (e) {}
     }
-  }, 500); // Debounce 500ms
+  }, 500);
 });
 
-// Listen for messages from background script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getPageContext') {
     try {
@@ -438,9 +401,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Send context when page loads
 window.addEventListener('load', () => {
-  // Optionally send context to background script on page load
   try {
     const context = extractPageContext();
     browser.runtime.sendMessage({
