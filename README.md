@@ -17,17 +17,30 @@ TabMind is a privacy-first browser extension that gives your browser a brain of 
 *   **Local LLM Integration**: Plug & play with LM Studio, Ollama, or any OpenAI-compatible local server.
 *   **Smart Context Extraction**:
     *   **Full Page Mode**: Digests the entire article, blog post, or documentation page.
+      <img width="1832" height="1521" alt="image" src="https://github.com/user-attachments/assets/7dcb58d4-28c4-4c69-bef6-c58f0891b957" />
+      
     *   **Precision Mode**: Highlight specific text, and TabMind instantly focuses on just that snippet.
+      <img width="1832" height="1521" alt="image" src="https://github.com/user-attachments/assets/c3225404-207d-42ad-8116-e757f0210593" />
+      
 *   **Interactive Sidebar**:
     *   **Chat**: Have a conversation with the page or any highlighted snippet.
     *   **Dynamic Chips**: Suggestions swap automatically between full-page and selection mode.
     *   **One-Click Copy**: Hover any AI response to copy the full answer instantly.
     *   **Customizable**: Dark mode, resizable width, optional page context pane, and toggleable system messages.
+   
+    ![Screenshot 2025-11-25 at 22 04 29](https://github.com/user-attachments/assets/7c566a94-9a6e-4361-a6e2-683d7e782426)
+![Screenshot 2025-11-25 at 21 55 12](https://github.com/user-attachments/assets/e9662e1f-1c3a-483b-bc33-07af293c9e17)
+![Screenshot 2025-11-25 at 21 51 15](https://github.com/user-attachments/assets/91459ca6-f729-413d-aa23-c270f6f62b54)
+
 *   **Model Management**: Auto-detects your local models. Swap between Mistral, Llama 3, and DeepSeek in two clicks.
+     <img width="532" height="210" alt="image" src="https://github.com/user-attachments/assets/787536b7-1d6e-4290-9da6-6f61c4555295" />
+     
 *   **Power User Settings**:
     *   Custom API endpoints.
     *   Configurable timeouts (because sometimes local 70B models need a minute to think).
     *   Fine-grained visibility controls for system messages and page context.
+      <img width="458" height="571" alt="image" src="https://github.com/user-attachments/assets/3d97eb8d-0900-42df-97ff-a1a4c85d5087" />
+
 
 ## 🛠️ Installation
 
