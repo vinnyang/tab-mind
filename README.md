@@ -1,75 +1,80 @@
-# TabMind - Browser Agent
+# <img src="icon.svg" width="24" /> TabMind - Your Local Browser Agent 🧠
 
-TabMind is a Firefox extension that brings the power of local Large Language Models (LLMs) directly to your browsing experience. It allows you to chat with your current web page using models running locally on your machine (via LM Studio, Ollama, or other OpenAI-compatible endpoints).
+**Stop sending your browsing data to the cloud. Bring the AI to your browser.**
 
-## Features
+TabMind is a privacy-first browser extension that gives your browser a brain of its own. It connects directly to your **local** Large Language Models (like LM Studio or Ollama) to analyze web pages, summarize articles, and answer questions—all without your data ever leaving your machine.
 
-- **Local LLM Integration**: Connects to your local inference server (e.g., LM Studio, Ollama) to process data without sending it to the cloud.
-- **Page Context Extraction**: Automatically extracts and cleans the main content of the active tab (text, headings, links) to provide context for the LLM.
-- **Interactive Sidebar**:
-  - Chat interface to ask questions about the page.
-  - Quick suggestion chips (Summarize, Key Points, Simplify, Critique, etc.).
-  - Adjustable sidebar width.
-- **Model Management**: Auto-detects available models from your local server and allows easy switching.
-- **Customizable Endpoint**: Supports custom host/port configurations for different local servers.
-- **Tokyo Night Theme**: A clean, dark-mode UI inspired by the Tokyo Night color scheme.
+---
 
-## Installation
+## 🚀 Why TabMind?
 
-1.  **Clone or Download** this repository to your local machine.
-2.  Open Firefox and navigate to `about:debugging`.
-3.  Click on **"This Firefox"** in the left sidebar.
-4.  Click **"Load Temporary Add-on..."**.
-5.  Navigate to the project directory and select the `manifest.json` file.
-6.  The **TabMind** icon should appear in your toolbar.
+*   **🔒 Private by Design**: Your data stays on localhost. Zero cloud leakage.
+*   **⚡ Local Power**: Run 7B, 13B, or even 70B models on your own hardware.
+*   **🧠 Context Aware**: It reads what you read. Select text to focus on specific paragraphs, or let it digest the whole page.
 
-## Usage
+## ✨ Features
 
-### 1. Start Your Local LLM Server
+*   **Local LLM Integration**: Plug & play with LM Studio, Ollama, or any OpenAI-compatible local server.
+*   **Smart Context Extraction**:
+    *   **Full Page Mode**: Digests the entire article, blog post, or documentation page.
+    *   **Precision Mode**: Highlight specific text, and TabMind instantly focuses on just that snippet.
+*   **Interactive Sidebar**:
+    *   **Chat**: Have a conversation with the page or any highlighted snippet.
+    *   **Dynamic Chips**: Suggestions swap automatically between full-page and selection mode.
+    *   **One-Click Copy**: Hover any AI response to copy the full answer instantly.
+    *   **Customizable**: Dark mode, resizable width, optional page context pane, and toggleable system messages.
+*   **Model Management**: Auto-detects your local models. Swap between Mistral, Llama 3, and DeepSeek in two clicks.
+*   **Power User Settings**:
+    *   Custom API endpoints.
+    *   Configurable timeouts (because sometimes local 70B models need a minute to think).
+    *   Fine-grained visibility controls for system messages and page context.
 
-Ensure your local LLM server is running and accessible.
+## 🛠️ Installation
 
-- **LM Studio**: Start the server (usually on port `1234`). Ensure CORS is enabled if necessary (though the extension runs in a privileged context).
-- **Ollama**: Start Ollama (usually on port `11434`).
+1.  **Clone or Download** this repo.
+2.  **Build it**:
+    ```bash
+    npm install
+    npm run build
+    ```
+3.  **Load it** (Firefox only — this add-on relies on Firefox-specific APIs):
+    *   Go to `about:debugging` > **This Firefox**.
+    *   Click **Load Temporary Add-on…** and select `manifest.json`.
 
-### 2. Open TabMind
+## 🎮 Usage Guide
 
-Click the extension icon in the toolbar or use the keyboard shortcut (if configured) to open the sidebar.
+### 1. Fire Up Your Model 🔥
+Make sure your local server is running:
+*   **LM Studio**: Start server on port `1234`. (Turn on CORS!)
+*   **Ollama**: `ollama serve` (usually port `11434`).
 
-### 3. Configure Connection
+### 2. Connect TabMind 🔗
+*   Open the sidebar (click the icon).
+*   Hit the **Gear Icon** ⚙️.
+*   Enter your address (e.g., `http://localhost:1234/v1`).
+*   Click **Detect Models** 🔄.
+*   Pick your weapon of choice from the dropdown.
 
-- In the sidebar header, enter your local server address (e.g., `localhost:1234`).
-- Click the **Refresh** (circular arrow) icon to detect available models.
-- Select your desired model from the dropdown.
+### 3. Chat Away 💬
+*   **Analyze the Page**: "What is the main argument of this article?"
+*   **Analyze a Selection**: Highlight a complex paragraph and ask, "Explain this in simple terms."
+*   **Use Chips**: Click "Summarize" for a quick TL;DR (or swap to selection-specific actions).
 
-### 4. Chat with the Page
+## 🔌 Supported Backends
 
-- The extension automatically extracts the content of the current tab.
-- Use the **Suggestion Chips** to quickly analyze the page (e.g., "Summarize", "Key Points").
-- Or type your own question in the input box and hit **Send**.
+If it speaks "OpenAI API", TabMind understands it.
+*   **LM Studio** (Highly Recommended for UI)
+*   **Ollama** (Great for CLI lovers)
+*   **LocalAI**
+*   **vLLM**
 
-## Supported Backends
+## 👨‍💻 Development
 
-TabMind works with any server providing an OpenAI-compatible API structure.
+Want to hack on it?
+*   `src/background.js`: The brain. Handles API calls, timeouts, and LangGraph logic.
+*   `src/content.js`: The eyes. Reads the DOM, extracts text, and watches for selections.
+*   `src/sidebar.js`: The face. Manages the chat UI, settings, and those snappy suggestion chips.
 
-- **LM Studio** (Recommended for ease of use)
-- **Ollama**
-- **LocalAI**
-- **Generic OpenAI-compatible endpoints**
+## 📄 License
 
-## Permissions
-
-- `activeTab`: To read the content of the current tab when you interact with the extension.
-- `storage`: To save your preferences (endpoint URL, selected model).
-- `scripting`: To inject the content extraction script.
-- `tabs`: To communicate between the sidebar and the active tab.
-
-## Development
-
-- `background.js`: Handles API requests, LLM communication, and settings management.
-- `content.js`: Runs on the web page to extract readable text and metadata.
-- `sidebar.js` / `sidebar.html` / `sidebar.css`: Manages the UI and user interaction.
-
-## License
-
-MIT
+MIT. Go wild. build cool stuff.

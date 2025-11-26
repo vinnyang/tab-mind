@@ -1,24 +1,76 @@
-// background.js - Enhanced with better error handling
+import { StateGraph, END, START } from "@langchain/langgraph";
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
+
+// Define the graph state
+const graphState = {
+  messages: {
+    value: (x, y) => x.concat(y),
+    default: () => [],
+  },
+  context: {
+    value: (x, y) => y, // Latest context overwrites
+    default: () => ({}),
+  },
+  settings: {
+    value: (x, y) => y,
+    default: () => ({}),
+  }
+};
+
+// Define the agent node (communicates with local LLM)
+async function agentNode(state) {
+  const { messages, context, settings } = state;
+
+  // We'll instantiate a temporary agent to use its query methods
+  // In a real refactor, we'd separate the LLM service
+  // Pass settings directly to constructor to avoid race condition with loadSettings()
+  try {
+    const tabMind = new TabMindAgent(settings);
+
+    // Pass the full message history to the new queryChat method
+    // We need to pass context as well so it can be injected
+    const response = await tabMind.queryChat(messages, context);
+    return { messages: [new AIMessage(response)] };
+  } catch (error) {
+    console.error("Error in agentNode:", error);
+    return { messages: [new AIMessage(`Error: ${error.message}`)] };
+  }
+}
+
+// Compile the graph
+const workflow = new StateGraph({ channels: graphState })
+  .addNode("agent", agentNode)
+  .addEdge(START, "agent")
+  .addEdge("agent", END);
+
+const app = workflow.compile();
+
+// ... existing TabMindAgent class ...
 class TabMindAgent {
-  constructor() {
+  constructor(initialSettings = null) {
     this.contextCache = new Map();
-    this.llmSettings = {
-      service: 'openai',
-      endpoint: 'localhost:1234',
-      model: '',
-      apiKey: '',
-      models: [],
-    };
-    this.loadSettings();
+    if (initialSettings) {
+      this.llmSettings = initialSettings;
+    } else {
+      this.llmSettings = {
+        service: 'openai',
+        endpoint: 'localhost:1234',
+        model: '',
+        apiKey: '',
+        timeout: 300000, // Default timeout in ms (5 mins)
+        models: [],
+      };
+      this.loadSettings();
+    }
   }
 
   loadSettings() {
     // Load saved settings or use defaults
     browser.storage.local.get(['llmSettings']).then((result) => {
       if (result.llmSettings) {
-        this.llmSettings = result.llmSettings;
+        // Merge saved settings with current defaults to ensure new fields (like timeout) exist
+        this.llmSettings = { ...this.llmSettings, ...result.llmSettings };
       }
-      console.log('Loaded settings:', this.llmSettings);
       // Auto-detect models when settings are loaded
       this.autoDetectModels();
     });
@@ -51,7 +103,10 @@ class TabMindAgent {
       baseUrl = baseUrl.replace(/\/v1$/, '');
 
       // Existing LM Studio detection logic
-      const possibleEndpoints = [`${baseUrl}/v1/models`, `${baseUrl}/models`];
+      const possibleEndpoints = [
+        `${baseUrl}/v1/models`,
+        `${baseUrl}/models`
+      ];
 
       let detectedModels = [];
 
@@ -69,20 +124,19 @@ class TabMindAgent {
             } else if (data.models && Array.isArray(data.models)) {
               detectedModels = data.models.map((m) => m.id || m.name);
             } else if (Array.isArray(data)) {
-              detectedModels = data.map((m) => m.id || m.name || m);
+              detectedModels = data.map(m => m.id || m.name || m);
             } else if (data.model) {
               detectedModels = [data.model];
             }
           }
-        } catch {}
+        } catch (e) {
+            // Silently fail individual endpoints
+        }
       }
 
       if (detectedModels.length) {
         this.llmSettings.models = detectedModels;
-        if (
-          !this.llmSettings.model ||
-          !detectedModels.includes(this.llmSettings.model)
-        ) {
+        if (!this.llmSettings.model || !detectedModels.includes(this.llmSettings.model)) {
           this.llmSettings.model = detectedModels[0];
         }
       } else {
@@ -96,14 +150,13 @@ class TabMindAgent {
   }
 
   async getContextForTab(tabId) {
-    // Check if we have cached context
-    if (this.contextCache.has(tabId)) {
-      const cached = this.contextCache.get(tabId);
-      if (Date.now() - cached.timestamp < 30000) {
-        // 30 second cache
-        return cached.data;
-      }
-    }
+    // Cache removed to ensure we always get the latest selection
+    // if (this.contextCache.has(tabId)) {
+    //   const cached = this.contextCache.get(tabId);
+    //   if (Date.now() - cached.timestamp < 30000) {
+    //     return cached.data;
+    //   }
+    // }
 
     try {
       const tab = await browser.tabs.get(tabId);
@@ -131,8 +184,6 @@ class TabMindAgent {
       const response = await browser.tabs.sendMessage(tab.id, {
         action: 'getPageContext',
       });
-
-      console.log('Received response from content script:', response);
 
       if (response && response.context) {
         return response.context;
@@ -281,32 +332,142 @@ class TabMindAgent {
     return out.trim();
   }
 
-  async queryLLM(context, prompt) {
+  // Handle full chat history
+  async queryChat(messages, context) {
     try {
-      // Add debug logging
-      console.log('Context being sent to LLM:', context);
-      console.log('Prompt being sent to LLM:', prompt);
-
       const settings = this.llmSettings;
-
-      console.log('LLM Settings:', settings);
-
       // Different handling based on service type
-      switch (settings.service) {
-        case 'lmstudio':
-          return await this.queryLMStudio(context, prompt);
-        case 'ollama':
-          return await this.queryOllama(context, prompt);
-        case 'openai':
-          return await this.queryOpenAI(context, prompt);
-        default:
-          return await this.queryLMStudio(context, prompt);
-      }
+      // For simplicity, we map both LM Studio and OpenAI to the same generic handler
+      // Ollama needs a slight adapter if it doesn't support standard OpenAI chat format perfectly,
+      // but usually it does.
+      return await this.queryGenericOpenAIChat(messages, context, settings.service);
     } catch (error) {
-      console.error('LLM query failed:', error);
+      console.error('LLM chat query failed:', error);
       throw new Error(`Failed to query LLM: ${error.message}`);
     }
   }
+
+  async queryGenericOpenAIChat(messages, context, serviceName) {
+    // Normalize endpoint URL
+    let rawEndpoint = this.llmSettings.endpoint.trim();
+    if (!rawEndpoint.match(/^https?:\/\//)) {
+      rawEndpoint = `http://${rawEndpoint}`;
+    }
+
+    let baseUrl = rawEndpoint.replace(/\/$/, '');
+    // Clean up base URL
+    baseUrl = baseUrl.replace(/\/v1\/completions$/, '');
+    baseUrl = baseUrl.replace(/\/v1\/chat\/completions$/, '');
+    baseUrl = baseUrl.replace(/\/v1$/, '');
+
+    const endpoint = `${baseUrl}/v1/chat/completions`;
+
+    try {
+      // Construct the messages payload
+      // 1. System Prompt
+      const systemPrompt = 'You are a helpful browser assistant. You answer questions based on the provided page context. You must respond with a valid JSON object containing a single field "answer". Example: { "answer": "Your response..." }. Ensure the JSON is valid and properly escaped. Do not include any markdown formatting outside the JSON. Do not include thinking or reasoning traces in the JSON output.';
+
+      // 2. Context Message (inject as system or high priority user message)
+      let contextContent = '';
+      if (context.selection && context.selection.trim().length > 0) {
+        contextContent = `Selected Text Context:\n${context.selection.substring(0, 15000)}`;
+      } else {
+        contextContent = `Page Context:\n${context.text.substring(0, 15000)}`;
+      }
+
+      const apiMessages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'system', content: contextContent }
+      ];
+
+      // 3. Append conversation history
+      for (const msg of messages) {
+        let role = 'user';
+        if (msg._getType() === 'ai') role = 'assistant';
+        else if (msg._getType() === 'system') role = 'system';
+
+        apiMessages.push({
+          role: role,
+          content: msg.content
+        });
+      }
+
+      // 4. Append JSON instruction reminder to the very last message to ensure adherence
+      const lastMsg = apiMessages[apiMessages.length - 1];
+      lastMsg.content += "\n\nRemember: Respond ONLY with valid JSON in the format { \"answer\": \"...\" }. Escape double quotes inside the answer string.";
+
+      const payload = {
+        model: this.llmSettings.model || 'local-model', // Fallback to 'local-model' if empty
+        messages: apiMessages,
+        max_tokens: 2048,
+        temperature: 0.2,
+        stream: false
+      };
+
+      // Add API key if present
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.llmSettings.apiKey) {
+        headers['Authorization'] = `Bearer ${this.llmSettings.apiKey}`;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.llmSettings.timeout || 300000);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const txt = await response.text();
+          throw new Error(`HTTP ${response.status}: ${txt}`);
+        }
+
+        const data = await response.json();
+
+        let rawContent = '';
+        if (data.choices && data.choices[0]) {
+          rawContent = data.choices[0].message?.content || '';
+        } else if (data.response) {
+          rawContent = typeof data.response === 'string' ? data.response : JSON.stringify(data.response);
+        }
+
+        // Clean and Parse
+        const cleanedContent = this.cleanLLMOutput(String(rawContent));
+        const jsonResult = this.extractAndParseJSON(cleanedContent);
+
+        if (jsonResult && jsonResult.answer) return jsonResult.answer;
+        if (jsonResult && jsonResult.content) return jsonResult.content;
+
+        // Regex Fallback
+        const answerRegex = /(?:["']?answer["']?)\s*:\s*"((?:[^"\\]|\\.)*)"/s;
+        const match = cleanedContent.match(answerRegex);
+        if (match) {
+             try { return JSON.parse(`"${match[1]}"`); } catch { return match[1]; }
+        }
+
+        console.warn('Could not extract JSON "answer" field, returning cleaned text');
+        return cleanedContent;
+
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error(`Request timed out after ${this.llmSettings.timeout || 300000}ms`);
+        }
+        throw error;
+      }
+
+    } catch (error) {
+      console.error(`Chat query failed:`, error);
+      throw error;
+    }
+  }
+
 
   // Parse JSON from LLM response, handling markdown blocks and loose text
   extractAndParseJSON(text) {
@@ -338,221 +499,10 @@ class TabMindAgent {
     }
   }
 
-  async queryLMStudio(context, prompt) {
-    return this.queryGenericOpenAI(context, prompt, 'LM Studio');
-  }
 
-  async queryOpenAI(context, prompt) {
-    return this.queryGenericOpenAI(context, prompt, 'OpenAI');
-  }
 
-  async queryGenericOpenAI(context, prompt, serviceName) {
-    console.log(`Attempting ${serviceName} query...`);
 
-    // Check if context is valid
-    if (!context || !context.text) {
-      console.error(`Invalid context for ${serviceName} query:`, context);
-      throw new Error('Invalid context - no text available');
-    }
-
-    // Normalize endpoint URL
-    let rawEndpoint = this.llmSettings.endpoint.trim();
-    if (!rawEndpoint.match(/^https?:\/\//)) {
-      rawEndpoint = `http://${rawEndpoint}`;
-    }
-
-    let baseUrl = rawEndpoint.replace(/\/$/, '');
-
-    // Remove known subpaths to get base
-    baseUrl = baseUrl.replace(/\/v1\/completions$/, '');
-    baseUrl = baseUrl.replace(/\/v1\/chat\/completions$/, '');
-    baseUrl = baseUrl.replace(/\/v1$/, '');
-
-    // Try different OpenAI-compatible endpoint formats
-    const endpointsToTry = [
-      `${baseUrl}/v1/chat/completions`,
-      `${baseUrl}/v1/completions`,
-    ];
-
-    // Try each endpoint format
-    for (const endpoint of endpointsToTry) {
-      try {
-        console.log(`Trying ${serviceName} endpoint: ${endpoint}`);
-
-        const isChatEndpoint = endpoint.includes('/chat/completions');
-
-        let payload;
-        const systemPrompt =
-          'You are a helpful browser assistant. You must respond with a valid JSON object containing a single field "answer". Example: { "answer": "Your summary here..." }. Ensure the JSON is valid and properly escaped. Do not include any markdown formatting outside the JSON. Do not include thinking or reasoning traces in the JSON output.';
-        const userContent = `${prompt}\n\nContext:\n${context.text.substring(
-          0,
-          1500
-        )}\n\nRemember: Respond ONLY with valid JSON in the format { "answer": "..." }. Escape double quotes inside the answer string.`;
-
-        if (isChatEndpoint) {
-          payload = {
-            model: this.llmSettings.model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userContent },
-            ],
-            max_tokens: 2048,
-            temperature: 0.2,
-            stream: false,
-          };
-        } else {
-          payload = {
-            model: this.llmSettings.model,
-            prompt: `${systemPrompt}\n\n${userContent}`,
-            max_tokens: 2048,
-            temperature: 0.2,
-            stream: false,
-          };
-        }
-
-        // Add API key if present
-        const headers = {
-          'Content-Type': 'application/json',
-        };
-        if (this.llmSettings.apiKey) {
-          headers['Authorization'] = `Bearer ${this.llmSettings.apiKey}`;
-        }
-
-        console.log(`Sending payload to ${serviceName}:`, payload);
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(payload),
-        });
-
-        console.log(
-          `Response from ${endpoint}:`,
-          response.status,
-          response.statusText
-        );
-
-        if (!response.ok) {
-          console.error(
-            `Endpoint ${endpoint} failed with status: ${response.status}`
-          );
-          console.error('Response body:', await response.text());
-          continue;
-        }
-
-        const data = await response.json();
-        console.log(`Success from ${endpoint}:`, data);
-
-        let rawContent = '';
-
-        // Handle different response formats
-        if (data.choices && data.choices[0]) {
-          rawContent =
-            data.choices[0].text ||
-            (data.choices[0].message && data.choices[0].message.content) ||
-            '';
-        } else if (data.response) {
-          rawContent =
-            typeof data.response === 'string'
-              ? data.response
-              : JSON.stringify(data.response);
-        }
-
-        // 1. Clean "thinking" blocks first
-        const cleanedContent = this.cleanLLMOutput(String(rawContent));
-
-        // 2. Try to parse as JSON
-        const jsonResult = this.extractAndParseJSON(cleanedContent);
-
-        if (jsonResult && jsonResult.answer) {
-          return jsonResult.answer;
-        } else if (jsonResult && jsonResult.content) {
-          return jsonResult.content; // Fallback common field
-        } else if (jsonResult && jsonResult.response) {
-          return jsonResult.response; // Fallback common field
-        } else {
-          // 3. Regex Fallback
-          const answerRegex = /(?:["']?answer["']?)\s*:\s*"((?:[^"\\]|\\.)*)"/s;
-          const match = cleanedContent.match(answerRegex);
-          if (match) {
-            try {
-              return JSON.parse(`"${match[1]}"`);
-            } catch {
-              return match[1];
-            }
-          }
-
-          // Fallback: return cleaned text
-          console.warn(
-            'Could not extract JSON "answer" field, returning cleaned text'
-          );
-          return cleanedContent;
-        }
-      } catch (error) {
-        console.error(`Endpoint ${endpoint} failed with error:`, error);
-        continue;
-      }
-    }
-
-    throw new Error(`All ${serviceName} endpoints failed`);
-  }
-
-  async queryOllama(context, prompt) {
-    const systemPrompt =
-      'You are a helpful browser assistant. You must respond with a valid JSON object containing a single field "answer". Example: { "answer": "Your summary here..." }. Ensure the JSON is valid and properly escaped. Do not include any markdown formatting outside the JSON. Do not include thinking or reasoning traces in the JSON output.';
-    const userContent = `${prompt}\n\nContext:\n${context.text.substring(
-      0,
-      1500
-    )}\n\nRemember: Respond ONLY with valid JSON in the format { "answer": "..." }. Escape double quotes inside the answer string.`;
-
-    const payload = {
-      model: this.llmSettings.model,
-      prompt: `${systemPrompt}\n\n${userContent}`,
-      stream: false,
-    };
-
-    const response = await fetch(this.llmSettings.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    let rawContent =
-      typeof data.response === 'string'
-        ? data.response
-        : JSON.stringify(data.response) || '';
-
-    // 1. Clean "thinking" blocks first
-    const cleanedContent = this.cleanLLMOutput(String(rawContent));
-
-    // 2. Try to parse as JSON
-    const jsonResult = this.extractAndParseJSON(cleanedContent);
-
-    // 3. Regex Fallback
-    const answerRegex = /(?:["']?answer["']?)\s*:\s*"((?:[^"\\]|\\.)*)"/s;
-    const match = cleanedContent.match(answerRegex);
-    if (match) {
-      try {
-        return JSON.parse(`"${match[1]}"`);
-      } catch {
-        return match[1];
-      }
-    }
-
-    console.warn(
-      'Could not extract JSON "answer" field, returning cleaned text'
-    );
-    return cleanedContent;
-  }
-
+  // Use LangGraph workflow instead of direct query
   async processWithLLM(tabId, userPrompt) {
     try {
       const context = await this.getContextForTab(tabId);
@@ -560,8 +510,16 @@ class TabMindAgent {
         throw new Error('No context available');
       }
 
-      const result = await this.queryLLM(context, userPrompt);
-      return result;
+      // Invoke the graph
+      const result = await app.invoke({
+        messages: [new HumanMessage(userPrompt)],
+        context: context,
+        settings: this.llmSettings
+      });
+
+      // Extract the final AI message
+      const lastMessage = result.messages[result.messages.length - 1];
+      return lastMessage.content;
     } catch (error) {
       console.error('LLM processing failed:', error);
       throw error;

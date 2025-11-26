@@ -1,3 +1,4 @@
+// content.js - Enhanced with sophisticated context extraction
 function extractPageContext() {
   const context = {
     url: window.location.href,
@@ -29,8 +30,6 @@ function extractPageContext() {
 
   // Calculate readability metrics
   context.readability = calculateReadability(context.text);
-
-  console.log('Extracted context:', context); // Debug log
 
   return context;
 }
@@ -99,8 +98,7 @@ function extractReadableText() {
     }
 
     // Fallback to body if no specific content area found or it's too small
-    const targetElement =
-      bestContent && maxTextLength > 200 ? bestContent : bodyClone;
+    const targetElement = (bestContent && maxTextLength > 200) ? bestContent : bodyClone;
 
     // Convert DOM to Markdown-like text
     return domToMarkdown(targetElement).substring(0, 15000); // Increased limit to 15KB
@@ -133,7 +131,7 @@ function domToMarkdown(node) {
 
     // Process children first
     let childrenText = '';
-    node.childNodes.forEach((child) => {
+    node.childNodes.forEach(child => {
       childrenText += domToMarkdown(child);
     });
 
@@ -396,12 +394,40 @@ function calculateFleschReadingEase(wordCount, sentenceCount, characterCount) {
   }
 }
 
+// Listen for text selection changes
+let selectionTimeout;
+document.addEventListener('selectionchange', () => {
+  if (selectionTimeout) clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(() => {
+    const selection = window.getSelection().toString();
+    if (selection) {
+       try {
+         // Send update message to runtime (received by sidebar/background)
+         browser.runtime.sendMessage({
+           action: 'selectionChanged',
+           selectionLength: selection.length,
+           hasSelection: selection.length > 0
+         });
+       } catch (e) {
+         // Ignore errors if extension context is invalidated
+       }
+    } else {
+       try {
+         browser.runtime.sendMessage({
+           action: 'selectionChanged',
+           selectionLength: 0,
+           hasSelection: false
+         });
+       } catch (e) {}
+    }
+  }, 500); // Debounce 500ms
+});
+
 // Listen for messages from background script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getPageContext') {
     try {
       const context = extractPageContext();
-      console.log('Sending context back to background:', context); // Debug log
       sendResponse({ context });
     } catch (error) {
       console.error('Error in getPageContext:', error);
