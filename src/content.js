@@ -31,8 +31,6 @@ function extractPageContext() {
   // Calculate readability metrics
   context.readability = calculateReadability(context.text);
 
-  console.log('Extracted context:', context); // Debug log
-
   return context;
 }
 
@@ -396,12 +394,40 @@ function calculateFleschReadingEase(wordCount, sentenceCount, characterCount) {
   }
 }
 
+// Listen for text selection changes
+let selectionTimeout;
+document.addEventListener('selectionchange', () => {
+  if (selectionTimeout) clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(() => {
+    const selection = window.getSelection().toString();
+    if (selection) {
+       try {
+         // Send update message to runtime (received by sidebar/background)
+         browser.runtime.sendMessage({
+           action: 'selectionChanged',
+           selectionLength: selection.length,
+           hasSelection: selection.length > 0
+         });
+       } catch (e) {
+         // Ignore errors if extension context is invalidated
+       }
+    } else {
+       try {
+         browser.runtime.sendMessage({
+           action: 'selectionChanged',
+           selectionLength: 0,
+           hasSelection: false
+         });
+       } catch (e) {}
+    }
+  }, 500); // Debounce 500ms
+});
+
 // Listen for messages from background script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getPageContext') {
     try {
       const context = extractPageContext();
-      console.log('Sending context back to background:', context); // Debug log
       sendResponse({ context });
     } catch (error) {
       console.error('Error in getPageContext:', error);

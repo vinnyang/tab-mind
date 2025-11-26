@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "TabMind - Browser Agent",
+  "name": "TabMind - Local Browser Agent",
   "version": "1.0",
   "description": "Provides context to local LLMs from browser tabs with chat interface",
   "permissions": ["activeTab", "tabs", "storage", "<all_urls>"],

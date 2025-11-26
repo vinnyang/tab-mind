@@ -12,6 +12,6 @@
     "async_hooks": "^1.0.0"
   },
   "devDependencies": {
-    "vite": "^5.2.0"
+    "vite": "^7.2.4"
   }
 }
