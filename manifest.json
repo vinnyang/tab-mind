@@ -8,10 +8,11 @@
   "content_scripts": [{ "matches": ["<all_urls>"], "js": ["dist/content.js"] }],
   "sidebar_action": {
     "default_panel": "sidebar.html",
-    "default_title": "TabMind - Browser Agent"
+    "default_title": "TabMind - Local Browser Agent",
+    "default_icon": "icon.svg"
   },
   "browser_action": {
-    "default_title": "TabMind - Browser Agent",
+    "default_title": "TabMind - Local Browser Agent",
     "default_icon": "icon.svg"
   },
   "icons": { "48": "icon.svg", "96": "icon.svg" }
