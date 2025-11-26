@@ -27,7 +27,7 @@ TabMind is a privacy-first browser extension that gives your browser a brain of 
       
 *   **Interactive Sidebar**:
     *   **Chat**: Have a conversation with the page or any highlighted snippet.
-    *   **Dynamic Chips**: Suggestions swap automatically between full-page and selection mode.
+    *   **Dynamic Suggestions**: Suggestions swap automatically between full-page and selection mode.
     *   **One-Click Copy**: Hover any AI response to copy the full answer instantly.
     *   **Customizable**: Dark mode, resizable width, optional page context pane, and toggleable system messages.
    
@@ -36,6 +36,9 @@ TabMind is a privacy-first browser extension that gives your browser a brain of 
     ![Screenshot 2025-11-25 at 21 55 12](https://github.com/user-attachments/assets/e9662e1f-1c3a-483b-bc33-07af293c9e17)
 
     ![Screenshot 2025-11-25 at 21 51 15](https://github.com/user-attachments/assets/91459ca6-f729-413d-aa23-c270f6f62b54)
+
+    <img width="1832" height="1521" alt="image" src="https://github.com/user-attachments/assets/68dfc5ba-95a0-4165-a013-961fac114f4a" />
+
 
 *   **Model Management**: Auto-detects your local models. Swap between Mistral, Llama 3, and DeepSeek in two clicks.
     <img width="532" height="210" alt="image" src="https://github.com/user-attachments/assets/787536b7-1d6e-4290-9da6-6f61c4555295" />
