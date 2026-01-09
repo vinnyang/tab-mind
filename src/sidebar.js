@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     debugInfo: document.getElementById('debug-info'),
     debugText: document.getElementById('debug-text'),
     detectModelsButton: document.getElementById('detect-models'),
+    refreshModelsBtn: document.getElementById('refresh-models-btn'),
     modelInfo: document.getElementById('model-info'),
     sidebarContainer: document.getElementById('sidebar-container'),
     modelSelect: document.getElementById('model-select'),
@@ -29,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let modelInfoTimeout = null;
-  let showSystemMessages = true;
+  let showSystemMessages = false;
   let showPageContext = true;
 
   function setTheme(theme) {
@@ -461,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const sysVisible =
         result.showSystemMessages !== undefined
           ? result.showSystemMessages
-          : true;
+          : false;
       const contextVisible =
         result.showPageContext !== undefined ? result.showPageContext : true;
       setSystemMessagesVisibility(sysVisible);
@@ -604,10 +605,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  elements.detectModelsButton.addEventListener('click', async () => {
+  async function detectModelsAndUpdateUI() {
     try {
       if (modelInfoTimeout) clearTimeout(modelInfoTimeout);
-      elements.modelInfo.textContent = 'Detecting models...';
+      if (elements.modelInfo) {
+        elements.modelInfo.textContent = 'Detecting models...';
+      }
 
       const response = await browser.runtime.sendMessage({
         action: 'detectModels',
@@ -615,26 +618,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (response.success) {
         const models = response.models;
-        elements.modelInfo.textContent = models.length
-          ? `Detected models: ${models.join(', ')}`
-          : 'No model found';
+        if (elements.modelInfo) {
+          elements.modelInfo.textContent = models.length
+            ? `Detected models: ${models.join(', ')}`
+            : 'No model found';
+        }
 
         const settings = await getSettings();
         const selected = settings.model || (models[0] ?? '');
         populateModelSelect(models, selected);
       } else {
-        elements.modelInfo.textContent = `Error: ${response.error}`;
+        if (elements.modelInfo) {
+          elements.modelInfo.textContent = `Error: ${response.error}`;
+        }
       }
     } catch (error) {
       console.error('Model detection failed:', error);
-      elements.modelInfo.textContent = `Error: ${error.message}`;
+      if (elements.modelInfo) {
+        elements.modelInfo.textContent = `Error: ${error.message}`;
+      }
     } finally {
       modelInfoTimeout = setTimeout(() => {
-        elements.modelInfo.textContent = '';
+        if (elements.modelInfo) {
+          elements.modelInfo.textContent = '';
+        }
         modelInfoTimeout = null;
       }, 5000);
     }
-  });
+  }
+
+  elements.detectModelsButton.addEventListener('click', detectModelsAndUpdateUI);
+
+  if (elements.refreshModelsBtn) {
+    elements.refreshModelsBtn.addEventListener('click', detectModelsAndUpdateUI);
+  }
 
   if (elements.refreshButton) {
     elements.refreshButton.addEventListener('click', async () => {

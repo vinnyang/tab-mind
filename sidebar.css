@@ -83,23 +83,13 @@ body {
 /* Removed .sidebar-header styles */
 
 .settings-btn {
-  /* Moved from header to model selection area */
-  background: none;
-  border: none;
-  color: var(--text-light);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px; /* Reduced padding */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 5px; /* restore margin left */
+  /* Now in the context header buttons area */
   flex-shrink: 0; /* Prevent button from shrinking */
 }
 
 .settings-btn svg {
-  width: 18px; /* Reduced size */
-  height: 18px; /* Reduced size */
+  width: 16px;
+  height: 16px;
   fill: currentColor;
 }
 
@@ -512,8 +502,14 @@ input:checked + .slider:before {
   border-radius: 0; /* Override for specific section style */
 }
 
-.context-section.force-hidden {
+.context-section.force-hidden .context-content {
   display: none !important;
+}
+
+.context-section.force-hidden .toggle-context-btn,
+.context-section.force-hidden #refresh-button {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .context-section.hidden .context-content,
@@ -556,7 +552,8 @@ input:checked + .slider:before {
 .btn-icon,
 .toggle-context-btn,
 .refresh-btn,
-.model-refresh-btn {
+.model-refresh-btn,
+.settings-btn {
   background: var(--secondary-color);
   color: var(--primary-color);
   border: 1px solid var(--border-color);
@@ -577,7 +574,8 @@ input:checked + .slider:before {
 .btn-icon:hover,
 .toggle-context-btn:hover,
 .refresh-btn:hover,
-.model-refresh-btn:hover {
+.model-refresh-btn:hover,
+.settings-btn:hover {
   background: var(--secondary-hover);
 }
 
