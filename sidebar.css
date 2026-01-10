@@ -214,9 +214,70 @@ body {
   padding: 10px 15px;
   background-color: var(--secondary-color);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   border-bottom: 1px solid var(--border-color);
+}
+
+.model-select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.model-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding-top: 5px;
+  border-top: 1px solid var(--border-color);
+}
+
+.model-filters.hidden {
+  display: none;
+}
+
+.model-search {
+  width: 100%;
+  padding: 5px 8px;
+  background-color: var(--background-color);
+  color: var(--text-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.model-search:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.variant-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.variant-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-light);
+  cursor: pointer;
+  user-select: none;
+}
+
+.variant-filter-label input {
+  margin: 0;
+}
+
+.model-count {
+  font-size: 10px;
+  color: var(--text-light);
+  text-align: right;
 }
 
 .model-selection-area .model-label {
@@ -729,6 +790,7 @@ input:checked + .slider:before {
 }
 
 .endpoint-input,
+.text-input,
 .timeout-input {
   width: 100%;
   padding: 6px;
@@ -741,9 +803,49 @@ input:checked + .slider:before {
 }
 
 .endpoint-input:focus,
+.text-input:focus,
 .timeout-input:focus {
   outline: none;
   border-color: var(--primary-color);
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.secondary-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.secondary-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.text-btn:hover {
+  color: var(--primary-color);
+}
+
+.helper-text {
+  font-size: 12px;
+  color: var(--text-light);
 }
 
 .model-select {

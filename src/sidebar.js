@@ -20,6 +20,14 @@ document.addEventListener('DOMContentLoaded', () => {
     contextSection: document.querySelector('.context-section'),
     toggleDebugButton: document.getElementById('toggle-debug'),
     debugSection: document.querySelector('.debug-section'),
+    providerSelect: document.getElementById('provider-select'),
+    apiKeyInput: document.getElementById('api-key-input'),
+    passphraseInput: document.getElementById('passphrase-input'),
+    saveApiKeyBtn: document.getElementById('save-api-key'),
+    forgetApiKeyBtn: document.getElementById('forget-api-key'),
+    refererInput: document.getElementById('referer-input'),
+    titleInput: document.getElementById('title-input'),
+    apiKeyStatus: document.getElementById('api-key-status'),
     resizeHandle: document.getElementById('resize-handle'),
     settingsBtn: document.getElementById('settings-btn'),
     settingsModal: document.getElementById('settings-modal'),
@@ -27,11 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
     themeSwitch: document.getElementById('theme-switch'),
     systemMsgSwitch: document.getElementById('system-msg-switch'),
     contextSwitch: document.getElementById('context-switch'),
+    openrouterFilters: document.getElementById('openrouter-filters'),
+    modelSearch: document.getElementById('model-search'),
+    variantFilters: document.getElementById('variant-filters'),
+    modelCount: document.getElementById('model-count'),
   };
 
   let modelInfoTimeout = null;
   let showSystemMessages = false;
   let showPageContext = true;
+  let currentModels = [];
+  let openrouterSearchText = '';
+  let selectedVariantSuffixes = new Set(['free']);
 
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
@@ -154,6 +169,40 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       elements.clearChatBtn.classList.add('hidden');
     }
+  }
+
+  function getDefaultEndpoint(provider) {
+    if (provider === 'openrouter') {
+      return 'https://openrouter.ai/api/v1';
+    }
+    if (provider === 'openai') {
+      return 'http://localhost:1234';
+    }
+    return '';
+  }
+
+  function renderApiKeyStatus(settings = {}) {
+    if (!elements.apiKeyStatus) return;
+    const hasKey = settings.hasApiKey;
+    const encrypted = settings.apiKeyIsEncrypted;
+    const locked = settings.requiresPassphrase;
+    if (locked) {
+      elements.apiKeyStatus.textContent =
+        'Key stored encrypted. Enter passphrase to unlock.';
+      return;
+    }
+    if (hasKey && encrypted) {
+      elements.apiKeyStatus.textContent = 'Key stored locally (encrypted).';
+    } else if (hasKey) {
+      elements.apiKeyStatus.textContent = 'Key stored locally (not synced).';
+    } else {
+      elements.apiKeyStatus.textContent = 'No key stored.';
+    }
+  }
+
+  function sanitizeInput(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str.trim().replace(/\s+/g, ' ');
   }
 
   function addMessage(text, type = 'assistant', options = {}) {
@@ -397,22 +446,145 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function populateModelSelect(models, selected) {
-    elements.modelSelect.innerHTML = '';
-    models.forEach((model) => {
-      const option = document.createElement('option');
-      option.value = model;
-      option.textContent = model;
-      if (model === selected) option.selected = true;
-      elements.modelSelect.appendChild(option);
+  function updateModelFiltersUI(provider, models) {
+    if (provider !== 'openrouter') {
+      elements.openrouterFilters.classList.add('hidden');
+      return;
+    }
+
+    elements.openrouterFilters.classList.remove('hidden');
+
+    // Extract variants from models
+    const variants = new Set(['free', 'thinking']);
+    models.forEach((m) => {
+      const parts = m.split(':');
+      if (parts.length > 1) {
+        variants.add(parts[parts.length - 1]);
+      }
+    });
+
+    // Render variant checkboxes
+    elements.variantFilters.innerHTML = '';
+    const sortedVariants = Array.from(variants).sort();
+    sortedVariants.forEach((variant) => {
+      const label = document.createElement('label');
+      label.className = 'variant-filter-label';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = variant;
+      checkbox.checked = selectedVariantSuffixes.has(variant);
+      checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          selectedVariantSuffixes.add(variant);
+        } else {
+          selectedVariantSuffixes.delete(variant);
+        }
+        filterAndPopulateModels();
+      });
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(`:${variant}`));
+      elements.variantFilters.appendChild(label);
     });
   }
 
+  function filterAndPopulateModels() {
+    if (!elements.modelSelect) return;
+
+    let filtered = currentModels;
+    const provider = elements.providerSelect?.value || 'openai';
+
+    if (provider === 'openrouter') {
+      if (openrouterSearchText) {
+        const lowerSearch = openrouterSearchText.toLowerCase();
+        filtered = filtered.filter((m) =>
+          m.toLowerCase().includes(lowerSearch)
+        );
+      }
+
+      if (selectedVariantSuffixes.size > 0) {
+        filtered = filtered.filter((m) => {
+          const parts = m.split(':');
+          if (parts.length < 2) return false;
+          return selectedVariantSuffixes.has(parts[parts.length - 1]);
+        });
+      }
+    }
+
+    // Preserve selection if possible
+    const previousSelection = elements.modelSelect.value;
+
+    elements.modelSelect.innerHTML = '';
+    filtered.forEach((model) => {
+      const option = document.createElement('option');
+      option.value = model;
+      option.textContent = model;
+      elements.modelSelect.appendChild(option);
+    });
+
+    if (elements.modelCount) {
+      elements.modelCount.textContent = `${filtered.length} of ${currentModels.length}`;
+    }
+
+    if (filtered.includes(previousSelection)) {
+      elements.modelSelect.value = previousSelection;
+    } else if (filtered.length > 0) {
+      elements.modelSelect.value = filtered[0];
+      // Only auto-save if user is actively interacting or it's a critical fallback
+      // Ideally we don't auto-save on every keystroke filter, but we need
+      // the selection to be valid for the next chat.
+      // Let's just update the UI value; actual save happens on 'change' event or next chat.
+      // But 'change' event isn't fired programmatically.
+      // So let's silently update settings to keep in sync.
+      updateSettings({ model: filtered[0] }).catch(() => {});
+    }
+  }
+
+  function populateModelSelect(models, selected) {
+    currentModels = models || [];
+    // Just save selection for filter logic to use
+    // Initial population happens via filter logic
+
+    // Check provider to init UI
+    const provider = elements.providerSelect?.value || 'openai';
+    updateModelFiltersUI(provider, currentModels);
+
+    // Set initial search/filter state from nothing?
+    // Or just clear them? Let's keep them if they exist in memory (page session)
+
+    // Force initial render
+    // Temporarily set value to 'selected' so filter logic can try to keep it
+    if (elements.modelSelect) elements.modelSelect.value = selected;
+
+    filterAndPopulateModels();
+
+    if (elements.modelSelect && elements.modelSelect.value !== selected && currentModels.includes(selected)) {
+        // If filter hid the selected model, but it's in the full list, what do?
+        // OpenRouter filters are strict. If you filter for 'free' and selected was 'paid', it's gone.
+        // So standard behavior is fine.
+    }
+  }
+
   async function updateSettings(newSettings) {
-    await browser.runtime.sendMessage({
+    const resp = await browser.runtime.sendMessage({
       action: 'setLLMSettings',
       settings: newSettings,
     });
+    if (!resp?.success) {
+      throw new Error(resp?.error || 'Failed to save settings');
+    }
+  }
+
+  async function updateSettingsWithPassphrase(newSettings, passphrase, options) {
+    const resp = await browser.runtime.sendMessage({
+      action: 'setLLMSettings',
+      settings: newSettings,
+      passphrase: passphrase || undefined,
+      encryptApiKey: options?.encryptApiKey || false,
+      clearApiKey: options?.clearApiKey || false,
+    });
+    if (!resp?.success) {
+      throw new Error(resp?.error || 'Failed to save settings');
+    }
   }
 
   async function getSettings() {
@@ -573,24 +745,148 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  if (elements.modelSearch) {
+    elements.modelSearch.addEventListener('input', (e) => {
+      openrouterSearchText = e.target.value.trim();
+      filterAndPopulateModels();
+    });
+  }
+
   elements.modelSelect.addEventListener('change', async () => {
-    const settings = await getSettings();
-    if (settings) {
-      await updateSettings({ ...settings, model: elements.modelSelect.value });
+    try {
+      await updateSettings({ model: elements.modelSelect.value });
+    } catch (error) {
+      addMessage(`Error saving model: ${error.message}`, 'system');
     }
   });
+
+  if (elements.providerSelect) {
+    elements.providerSelect.addEventListener('change', async () => {
+      const provider = elements.providerSelect.value;
+      const settings = await getSettings();
+
+      // Determine target endpoint
+      let updatedEndpoint = '';
+      if (provider === 'openrouter') {
+        updatedEndpoint = 'https://openrouter.ai/api/v1';
+      } else {
+        // Use stored endpoint for this provider or default
+        updatedEndpoint = settings.endpoints?.[provider] || getDefaultEndpoint(provider);
+      }
+
+      if (elements.endpointInput) {
+        elements.endpointInput.value = updatedEndpoint;
+      }
+
+      // Reset filters when switching to OpenRouter
+      if (provider === 'openrouter') {
+        openrouterSearchText = '';
+        if (elements.modelSearch) elements.modelSearch.value = '';
+      }
+
+      updateModelFiltersUI(provider, currentModels);
+      filterAndPopulateModels();
+
+      try {
+        await updateSettings({
+          provider,
+          service: provider,
+          endpoint: updatedEndpoint,
+        });
+      } catch (error) {
+        addMessage(`Error saving provider: ${error.message}`, 'system');
+      }
+    });
+  }
 
   if (elements.endpointInput) {
     elements.endpointInput.addEventListener('change', async () => {
       const newEndpoint = elements.endpointInput.value.trim();
       if (!newEndpoint) return;
 
-      const settings = await getSettings();
-      if (settings) {
-        await updateSettings({ ...settings, endpoint: newEndpoint });
+      try {
+        await updateSettings({ endpoint: newEndpoint });
         elements.detectModelsButton.click();
+      } catch (error) {
+        addMessage(`Error saving endpoint: ${error.message}`, 'system');
       }
     });
+  }
+
+  if (elements.refererInput) {
+    elements.refererInput.addEventListener('change', async () => {
+      const val = sanitizeInput(elements.refererInput.value);
+      try {
+        await updateSettings({ referer: val });
+      } catch (error) {
+        addMessage(`Error saving referer: ${error.message}`, 'system');
+      }
+    });
+  }
+
+  if (elements.titleInput) {
+    elements.titleInput.addEventListener('change', async () => {
+      const val = sanitizeInput(elements.titleInput.value);
+      try {
+        await updateSettings({ title: val });
+      } catch (error) {
+        addMessage(`Error saving title: ${error.message}`, 'system');
+      }
+    });
+  }
+
+  async function saveApiKey() {
+    const apiKey = sanitizeInput(elements.apiKeyInput?.value || '');
+    const passphrase = sanitizeInput(elements.passphraseInput?.value || '');
+
+    if (!apiKey && !passphrase) {
+      renderApiKeyStatus({ hasApiKey: false });
+      return;
+    }
+
+    try {
+      await updateSettingsWithPassphrase(
+        apiKey ? { apiKey } : {},
+        passphrase,
+        {
+        encryptApiKey: Boolean(passphrase && apiKey),
+        }
+      );
+      if (elements.apiKeyInput) elements.apiKeyInput.value = '';
+      if (elements.passphraseInput) elements.passphraseInput.value = '';
+      const updated = await getSettings();
+      renderApiKeyStatus(updated);
+      addMessage(
+        passphrase && apiKey
+          ? 'API key saved with encryption.'
+          : apiKey
+            ? 'API key saved locally.'
+            : 'Passphrase applied. If a key was stored encrypted, it is now unlocked.',
+        'system'
+      );
+    } catch (error) {
+      addMessage(`Error saving key: ${error.message}`, 'system');
+    }
+  }
+
+  async function forgetApiKey() {
+    try {
+      await updateSettingsWithPassphrase({}, null, { clearApiKey: true });
+      if (elements.apiKeyInput) elements.apiKeyInput.value = '';
+      if (elements.passphraseInput) elements.passphraseInput.value = '';
+      renderApiKeyStatus({ hasApiKey: false });
+      addMessage('API key cleared from local storage.', 'system');
+    } catch (error) {
+      addMessage(`Error clearing key: ${error.message}`, 'system');
+    }
+  }
+
+  if (elements.saveApiKeyBtn) {
+    elements.saveApiKeyBtn.addEventListener('click', saveApiKey);
+  }
+
+  if (elements.forgetApiKeyBtn) {
+    elements.forgetApiKeyBtn.addEventListener('click', forgetApiKey);
   }
 
   if (elements.timeoutInput) {
@@ -598,9 +894,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = parseInt(elements.timeoutInput.value, 10);
       const ms = val && val > 0 ? val * 1000 : 300000;
 
-      const settings = await getSettings();
-      if (settings) {
-        await updateSettings({ ...settings, timeout: ms });
+    try {
+      await updateSettings({ timeout: ms });
+    } catch (error) {
+      addMessage(`Error saving timeout: ${error.message}`, 'system');
       }
     });
   }
@@ -627,10 +924,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const settings = await getSettings();
         const selected = settings.model || (models[0] ?? '');
         populateModelSelect(models, selected);
+      renderApiKeyStatus(settings);
+      const provider = settings.provider || settings.service || 'openai';
+      const keyStatus = settings.requiresPassphrase
+        ? 'locked (passphrase needed)'
+        : settings.hasApiKey
+          ? settings.apiKeyIsEncrypted
+            ? 'set (encrypted)'
+            : 'set'
+          : 'missing';
+      elements.debugText.textContent = `Provider: ${provider}\nEndpoint: ${settings.endpoint}\nModel: ${settings.model}\nKey: ${keyStatus}`;
       } else {
         if (elements.modelInfo) {
           elements.modelInfo.textContent = `Error: ${response.error}`;
         }
+        addMessage(`Model detection failed: ${response.error}`, 'system');
       }
     } catch (error) {
       console.error('Model detection failed:', error);
@@ -702,15 +1010,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   getSettings().then((settings) => {
     if (settings) {
+      const provider =
+        settings.provider || settings.service || 'openai';
+      if (elements.providerSelect) {
+        elements.providerSelect.value = provider;
+      }
       if (settings.models) populateModelSelect(settings.models, settings.model);
       if (elements.endpointInput && settings.endpoint)
         elements.endpointInput.value = settings.endpoint;
+      else if (elements.endpointInput)
+        elements.endpointInput.value = getDefaultEndpoint(provider);
       if (elements.timeoutInput) {
         const ms = settings.timeout || 300000;
         elements.timeoutInput.value = Math.floor(ms / 1000);
       }
+      if (elements.refererInput && settings.referer)
+        elements.refererInput.value = settings.referer;
+      if (elements.titleInput && settings.title) {
+        elements.titleInput.value = settings.title;
+      }
+      renderApiKeyStatus(settings);
 
-      elements.debugText.textContent = `Service: ${settings.service}\nEndpoint: ${settings.endpoint}\nModel: ${settings.model}`;
+      const keyStatus = settings.requiresPassphrase
+        ? 'locked (passphrase needed)'
+        : settings.hasApiKey
+          ? settings.apiKeyIsEncrypted
+            ? 'set (encrypted)'
+            : 'set'
+          : 'missing';
+
+      elements.debugText.textContent = `Provider: ${provider}\nEndpoint: ${settings.endpoint}\nModel: ${settings.model}\nKey: ${keyStatus}`;
     }
   });
 

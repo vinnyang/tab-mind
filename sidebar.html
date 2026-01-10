@@ -46,8 +46,30 @@
           </div>
 
           <div class="setting-group">
-            <label class="setting-label">Local Server (Host:Port)</label>
-            <input type="text" id="endpoint-input" class="endpoint-input" placeholder="e.g. localhost:1234" />
+            <label class="setting-label">Provider</label>
+            <select id="provider-select" class="text-input">
+              <option value="openai">OpenAI-compatible / Local</option>
+              <option value="openrouter">OpenRouter (api.openrouter.ai)</option>
+              <option value="custom">Custom (specify base URL)</option>
+            </select>
+            <div class="helper-text">Keys stay in this browser only; never synced.</div>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label">Endpoint / Base URL</label>
+            <input type="text" id="endpoint-input" class="endpoint-input" placeholder="e.g. https://openrouter.ai/api/v1 or http://localhost:1234" />
+            <label class="setting-label">API Key</label>
+            <input type="password" id="api-key-input" class="text-input" placeholder="Enter your key (not stored in UI)" autocomplete="off" />
+            <label class="setting-label">Encrypt with Passphrase (optional, not stored)</label>
+            <input type="password" id="passphrase-input" class="text-input" placeholder="Enter to encrypt key at rest" autocomplete="off" />
+            <div class="button-row">
+              <button id="save-api-key" class="secondary-btn">Save key</button>
+              <button id="forget-api-key" class="text-btn">Forget key</button>
+            </div>
+            <div id="api-key-status" class="helper-text"></div>
+            <label class="setting-label">OpenRouter Headers (optional)</label>
+            <input type="text" id="referer-input" class="text-input" placeholder="HTTP-Referer (e.g., https://your.site)" />
+            <input type="text" id="title-input" class="text-input" placeholder="X-Title (e.g., TabMind - Browser Agent)" />
             <label class="setting-label">Timeout (seconds)</label>
             <input type="number" id="timeout-input" class="timeout-input" placeholder="300" min="10" />
             <label class="setting-label">Detect Models</label>
@@ -74,17 +96,24 @@
     </div>
 
     <div class="model-selection-area">
-      <label class="model-label">Select Model:</label>
-      <select id="model-select" class="model-select"></select>
-      <button id="refresh-models-btn" class="refresh-btn" title="Refresh models" aria-label="Refresh models">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-          class="feather feather-refresh-cw">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-      </button>
+      <div class="model-select-row">
+        <label class="model-label">Select Model:</label>
+        <select id="model-select" class="model-select"></select>
+        <button id="refresh-models-btn" class="refresh-btn" title="Refresh models" aria-label="Refresh models">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="feather feather-refresh-cw">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+      <div id="openrouter-filters" class="model-filters hidden">
+        <input type="text" id="model-search" class="model-search" placeholder="Search models..." />
+        <div id="variant-filters" class="variant-filters"></div>
+        <span id="model-count" class="model-count"></span>
+      </div>
     </div>
 
     <div class="sidebar-content">
