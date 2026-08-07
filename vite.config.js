@@ -18,13 +18,4 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-  optimizeDeps: {
-    exclude: ["async_hooks", "node:async_hooks"],
-  },
-  resolve: {
-    alias: {
-      "node:async_hooks": resolve(process.cwd(), "src/async_hooks_mock.js"),
-      "async_hooks": resolve(process.cwd(), "src/async_hooks_mock.js"),
-    },
-  },
 });
