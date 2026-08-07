@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # 1. Application dependencies.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "supply-chain"]
+    groups:
+      # Grouping is the difference between a working setup and one you mute.
+      # @langchain/* must move together or peer deps break.
+      langchain:
+        patterns: ["@langchain/*"]
+      dev-minor-patch:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+
+  # 2. CI actions. A mutable tag like @v4 can be repointed at attacker code
+  #    that runs with your workflow token.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
