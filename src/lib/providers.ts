@@ -65,6 +65,27 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
 
 export const DEFAULT_PROVIDER: ProviderId = "lmstudio";
 
+export function detectProviderFromEndpoint(endpoint: string): ProviderId {
+  let origin: string;
+  try {
+    origin = new URL(endpoint).origin;
+  } catch {
+    return "custom";
+  }
+  for (const id of Object.keys(PROVIDERS) as ProviderId[]) {
+    if (id === "custom") continue;
+    const def = PROVIDERS[id];
+    if (def.baseUrl) {
+      try {
+        if (new URL(def.baseUrl).origin === origin) return id;
+      } catch {
+        // malformed provider baseUrl — skip
+      }
+    }
+  }
+  return "custom";
+}
+
 /** The only origins the extension may talk to. */
 export function egressAllowList(active: ProviderDef, customBase?: string): string[] {
   const base = active.id === "custom" ? (customBase ?? "") : active.baseUrl;
