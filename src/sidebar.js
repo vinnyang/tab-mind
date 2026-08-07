@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let modelInfoTimeout = null;
   let showSystemMessages = false;
   let showPageContext = true;
+  let isRequestInProgress = false;
 
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
@@ -167,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let className = 'message';
     if (type === 'user') className += ' user-message';
     else if (type === 'system') className += ' system-message';
+    else if (type === 'error') className += ' error-message';
     else className += ' assistant-message';
 
     messageDiv.className = className;
@@ -303,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage(`Context refreshed: ${response.context.title}`, 'system');
         return response.context;
       } else {
-        addMessage('Error: Could not get context', 'system');
+        addMessage('Error: Could not get context', 'error');
         return null;
       }
     } catch (error) {
@@ -314,10 +316,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ) {
         addMessage(
           'Connection error: Please refresh the web page and try again.',
-          'system'
+          'error'
         );
       } else {
-        addMessage('Error: Could not get context', 'system');
+        addMessage('Error: Could not get context', 'error');
       }
       return null;
     }
@@ -343,6 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function queryLLM(prompt) {
+    if (isRequestInProgress) return null;
+    isRequestInProgress = true;
     try {
       setLoadingState(true);
       const tab = await getCurrentTab();
@@ -352,25 +356,54 @@ document.addEventListener('DOMContentLoaded', () => {
         prompt: prompt,
       });
 
-      setLoadingState(false);
-
       if (response.success) {
         addMessage(response.result, 'assistant');
         return response.result;
       } else {
-        addMessage(`Error: ${response.error}`, 'system');
+        addMessage(`Error: ${friendlyErrorKind(response.errorKind, response.error)}`, 'error');
         return null;
       }
     } catch (error) {
       console.error('LLM query failed:', error);
-      setLoadingState(false);
-      addMessage(`Error: ${error.message}`, 'system');
+      addMessage(`Error: ${error.message}`, 'error');
       return null;
+    } finally {
+      isRequestInProgress = false;
+      setLoadingState(false);
+    }
+  }
+
+  /**
+   * @param {string} kind
+   * @param {string} fallback
+   * @returns {string}
+   */
+  function friendlyErrorKind(kind, fallback) {
+    switch (kind) {
+      case "auth":
+        return "Authentication failed — check your API key";
+      case "rate_limit":
+        return "Rate limited — try again in a moment";
+      case "server":
+        return "Provider error — try again later";
+      case "network":
+        return "Network error — check your connection";
+      case "timeout":
+        return "Request timed out";
+      case "config":
+        return "Configuration error";
+      default:
+        return fallback;
     }
   }
 
   function setLoadingState(isLoading) {
     elements.sendButton.disabled = isLoading;
+    elements.promptInput.disabled = isLoading;
+    elements.modelSelect.disabled = isLoading;
+    elements.refreshButton.disabled = isLoading;
+    elements.settingsBtn.disabled = isLoading;
+    elements.clearChatBtn.disabled = isLoading;
 
     const suggestionButtons =
       elements.suggestionsContainer.querySelectorAll('.suggestion-btn');
@@ -629,7 +662,8 @@ document.addEventListener('DOMContentLoaded', () => {
         populateModelSelect(models, selected);
       } else {
         if (elements.modelInfo) {
-          elements.modelInfo.textContent = `Error: ${response.error}`;
+          const reason = friendlyErrorKind(response.errorKind, response.error);
+          elements.modelInfo.textContent = `No model found — ${reason}`;
         }
       }
     } catch (error) {

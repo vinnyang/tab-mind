@@ -487,6 +487,18 @@ input:checked + .slider:before {
   display: none;
 }
 
+.error-message {
+  background-color: color-mix(in srgb, var(--error-color, #e74c3c) 12%, transparent);
+  color: var(--error-color, #e74c3c);
+  font-style: italic;
+  font-size: 13px;
+  align-self: center;
+  text-align: center;
+  padding: 5px 10px;
+  border-radius: 10px;
+  max-width: 90%;
+}
+
 .context-section,
 .debug-section,
 .model-detection-section {
@@ -577,6 +589,28 @@ input:checked + .slider:before {
 .model-refresh-btn:hover,
 .settings-btn:hover {
   background: var(--secondary-hover);
+}
+
+.btn-icon:disabled,
+.toggle-context-btn:disabled,
+.refresh-btn:disabled,
+.model-refresh-btn:disabled,
+.settings-btn:disabled,
+.input-area button:disabled,
+.suggestion-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.input-area button:disabled {
+  background-color: var(--secondary-color);
+}
+
+textarea:disabled,
+select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .context-content,

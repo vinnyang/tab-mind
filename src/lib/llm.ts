@@ -72,10 +72,58 @@ function withTimeout(ms: number, external?: AbortSignal): AbortSignal {
   return ctrl.signal;
 }
 
-async function assertOk(res: Response): Promise<void> {
+export type LlmErrorKind =
+  | "auth"
+  | "rate_limit"
+  | "server"
+  | "network"
+  | "timeout"
+  | "config"
+  | "unknown";
+
+export class LlmError extends Error {
+  kind: LlmErrorKind;
+  provider: string;
+  statusCode?: number;
+
+  constructor(kind: LlmErrorKind, message: string, provider: string, statusCode?: number) {
+    super(message);
+    this.name = "LlmError";
+    this.kind = kind;
+    this.provider = provider;
+    this.statusCode = statusCode;
+  }
+}
+
+export function httpErrorKind(status: number): LlmErrorKind {
+  if (status === 401 || status === 403) return "auth";
+  if (status === 429) return "rate_limit";
+  if (status >= 500) return "server";
+  return "unknown";
+}
+
+export function httpErrorMessage(status: number): string {
+  if (status === 401) return "Authentication failed (401) — check your API key";
+  if (status === 403) return "Access denied (403) — check your API key";
+  if (status === 429) return "Rate limited (429) — try again in a moment";
+  if (status >= 500) return `Provider error (${status}) — try again later`;
+  return `Request failed (${status})`;
+}
+
+export function classifyFetchError(e: unknown): LlmErrorKind {
+  if (e instanceof DOMException && e.name === "AbortError") return "timeout";
+  return "network";
+}
+
+export function fetchErrorMessage(e: unknown): string {
+  if (e instanceof DOMException && e.name === "AbortError") return "Request timed out";
+  return e instanceof Error ? e.message : "Network error";
+}
+
+async function assertOk(res: Response, provider: string): Promise<void> {
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${txt}`);
+    throw new LlmError(httpErrorKind(res.status), httpErrorMessage(res.status), provider, res.status);
   }
 }
 
@@ -95,13 +143,18 @@ export async function callModel(opts: CallOptions): Promise<string> {
     stream: false,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: buildHeaders(provider, s),
-    body: JSON.stringify(payload),
-    signal: withTimeout(s.timeout ?? 300000, opts.signal),
-  });
-  await assertOk(res);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: buildHeaders(provider, s),
+      body: JSON.stringify(payload),
+      signal: withTimeout(s.timeout ?? 300000, opts.signal),
+    });
+  } catch (e) {
+    throw new LlmError(classifyFetchError(e), fetchErrorMessage(e), provider.id);
+  }
+  await assertOk(res, provider.id);
 
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
@@ -123,16 +176,21 @@ export async function streamModel(opts: StreamOptions): Promise<string> {
     stream: true,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: buildHeaders(provider, s),
-    body: JSON.stringify(payload),
-    signal: withTimeout(s.timeout ?? 300000, opts.signal),
-  });
-  await assertOk(res);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: buildHeaders(provider, s),
+      body: JSON.stringify(payload),
+      signal: withTimeout(s.timeout ?? 300000, opts.signal),
+    });
+  } catch (e) {
+    throw new LlmError(classifyFetchError(e), fetchErrorMessage(e), provider.id);
+  }
+  await assertOk(res, provider.id);
 
   const reader = res.body?.getReader();
-  if (!reader) throw new Error("No response body");
+  if (!reader) throw new LlmError("config", "No response body from provider", provider.id);
   const decoder = new TextDecoder();
   let full = "";
   let buf = "";

@@ -1,7 +1,18 @@
 import { HumanMessage } from '@langchain/core/messages';
 import { buildGraph } from './agent/graph.js';
-import { setSettings } from './lib/llm.js';
+import { setSettings, LlmError, httpErrorKind, httpErrorMessage, classifyFetchError, fetchErrorMessage } from './lib/llm.js';
 import { PROVIDERS, DEFAULT_PROVIDER, egressAllowList, assertEgressAllowed, detectProviderFromEndpoint } from './lib/providers.js';
+
+/**
+ * @param {unknown} error
+ * @returns {{ kind: string; message: string; provider?: string }}
+ */
+export function toClientError(error) {
+  if (error instanceof LlmError) {
+    return { kind: error.kind, message: error.message, provider: error.provider };
+  }
+  return { kind: "unknown", message: error instanceof Error ? error.message : "Unknown error" };
+}
 
 class TabMindAgent {
   constructor(initialSettings = null) {
@@ -67,20 +78,22 @@ class TabMindAgent {
         headers['Authorization'] = `Bearer ${this.llmSettings.apiKey}`;
       }
       const response = await fetch(url, { method: 'GET', headers });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data && Array.isArray(data.data)) {
-          detectedModels = data.data.map((m) => m.id);
-        } else if (data.models && Array.isArray(data.models)) {
-          detectedModels = data.models.map((m) => m.id || m.name);
-        } else if (Array.isArray(data)) {
-          detectedModels = data.map((m) => m.id || m.name || m);
-        } else if (data.model) {
-          detectedModels = [data.model];
-        }
+      if (!response.ok) {
+        throw new LlmError(httpErrorKind(response.status), httpErrorMessage(response.status), provider, response.status);
+      }
+      const data = await response.json();
+      if (data.data && Array.isArray(data.data)) {
+        detectedModels = data.data.map((m) => m.id);
+      } else if (data.models && Array.isArray(data.models)) {
+        detectedModels = data.models.map((m) => m.id || m.name);
+      } else if (Array.isArray(data)) {
+        detectedModels = data.map((m) => m.id || m.name || m);
+      } else if (data.model) {
+        detectedModels = [data.model];
       }
     } catch (e) {
-      console.warn('Model detection failed:', e.message);
+      if (e instanceof LlmError) throw e;
+      throw new LlmError(classifyFetchError(e), fetchErrorMessage(e), provider);
     }
 
     if (detectedModels.length) {
@@ -287,9 +300,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       agent
         .processWithLLM(message.tabId, message.prompt)
         .then((result) => sendResponse({ success: true, result }))
-        .catch((error) =>
-          sendResponse({ success: false, error: error.message })
-        );
+        .catch((error) => {
+          const clientError = toClientError(error);
+          sendResponse({ success: false, error: clientError.message, errorKind: clientError.kind, errorProvider: clientError.provider });
+        });
       return true; // Keep message channel open for async response
 
     case 'getPageContext':
@@ -313,9 +327,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       agent
         .autoDetectModels()
         .then((models) => sendResponse({ success: true, models }))
-        .catch((error) =>
-          sendResponse({ success: false, error: error.message })
-        );
+        .catch((error) => {
+          const clientError = toClientError(error);
+          sendResponse({ success: false, error: clientError.message, errorKind: clientError.kind, errorProvider: clientError.provider });
+        });
       return true;
   }
 });

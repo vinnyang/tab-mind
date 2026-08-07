@@ -82,7 +82,7 @@ function extractReadableText() {
     const targetElement =
       bestContent && maxTextLength > 200 ? bestContent : bodyClone;
 
-    return domToMarkdown(targetElement).substring(0, 15000);
+    return domToMarkdown(targetElement).substring(0, 200000);
   } catch (error) {
     console.error('Error extracting readable text:', error);
     return 'Failed to extract page content';
