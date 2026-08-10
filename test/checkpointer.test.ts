@@ -31,7 +31,6 @@ function makeCheckpoint(threadId: string): { config: RunnableConfig; checkpoint:
     channel_values: { messages: ["hello"], rawPage: "page content here" },
     channel_versions: { messages: "1", rawPage: "1" },
     versions_seen: {},
-    pending_sends: [],
   };
   const metadata: CheckpointMetadata = {
     source: "loop",
@@ -61,7 +60,7 @@ describe("BrowserStorageSaver", () => {
     expect(tuple).toBeDefined();
     expect(tuple!.checkpoint.id).toBe(checkpoint.id);
     expect(tuple!.checkpoint.channel_values.rawPage).toBe("page content here");
-    expect(tuple!.metadata.source).toBe("loop");
+    expect(tuple!.metadata!.source).toBe("loop");
   });
 
   it("reads the latest checkpoint when no checkpoint_id given", async () => {
@@ -93,8 +92,8 @@ describe("BrowserStorageSaver", () => {
       tuples.push(t);
     }
     expect(tuples.length).toBe(2);
-    expect(tuples[0].checkpoint.id).toBe("ckpt-b");
-    expect(tuples[1].checkpoint.id).toBe(ckpt1.id);
+    expect(tuples[0]!.checkpoint.id).toBe("ckpt-b");
+    expect(tuples[1]!.checkpoint.id).toBe(ckpt1.id);
   });
 
   it("returns undefined for unknown thread", async () => {
