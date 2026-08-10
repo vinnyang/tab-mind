@@ -1,3 +1,5 @@
+import { safeHref } from "./security/urlPolicy.js";
+
 document.addEventListener('DOMContentLoaded', () => {
   const elements = {
     sendButton: document.getElementById('send-button'),
@@ -111,11 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     text = text.replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
-      (m, label, url) =>
-        `<a href="${url.replace(
+      (m, label, url) => {
+        const href = safeHref(url);
+        return `<a href="${href.replace(
           /"/g,
           '%22'
-        )}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        )}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      }
     );
 
     text = text.replace(
