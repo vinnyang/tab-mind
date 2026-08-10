@@ -1,4 +1,4 @@
-# <img src="icon.svg" width="24" /> TabMind - Your Local Browser Agent 🧠
+# <img src="icon.svg" width="24" /> TabMind - Your Local Browser Agent 🧠 [![ci](https://github.com/vinnyang/tab-mind/actions/workflows/ci.yml/badge.svg)](https://github.com/vinnyang/tab-mind/actions/workflows/ci.yml)
 
 **Stop sending your browsing data to the cloud. Bring the AI to your browser.**
 
