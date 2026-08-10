@@ -2,6 +2,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { buildGraph } from './agent/graph.js';
 import { setSettings, LlmError, httpErrorKind, httpErrorMessage, classifyFetchError, fetchErrorMessage } from './lib/llm.js';
 import { PROVIDERS, DEFAULT_PROVIDER, egressAllowList, assertEgressAllowed, detectProviderFromEndpoint } from './lib/providers.js';
+import { BrowserStorageSaver } from './agent/checkpointer.js';
 
 /**
  * @param {unknown} error
@@ -262,7 +263,7 @@ class TabMindAgent {
     });
   }
 
-  async processWithLLM(tabId, userPrompt) {
+  async processWithLLM(tabId, userPrompt, streamId) {
     try {
       const context = await this.getContextForTab(tabId);
       if (!context) {
@@ -271,12 +272,18 @@ class TabMindAgent {
 
       await this.syncLlmSettings();
 
-      const app = buildGraph();
+      const checkpointer = new BrowserStorageSaver();
+      const onToken = (token) => {
+        browser.runtime
+          .sendMessage({ action: 'llmToken', streamId, token })
+          .catch(() => {});
+      };
+      const app = buildGraph(checkpointer, onToken);
       const result = await app.invoke({
         messages: [new HumanMessage(userPrompt)],
         rawPage: context.text || '',
         selection: context.selection || '',
-      });
+      }, { configurable: { thread_id: `tab-${tabId}` } });
 
       const lastMessage = result.messages[result.messages.length - 1];
       return lastMessage.content;
@@ -284,6 +291,11 @@ class TabMindAgent {
       console.error('LLM processing failed:', error);
       throw error;
     }
+  }
+
+  async clearThread(tabId) {
+    const checkpointer = new BrowserStorageSaver();
+    await checkpointer.deleteThread(`tab-${tabId}`);
   }
 }
 
@@ -298,7 +310,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'queryLLM':
       agent
-        .processWithLLM(message.tabId, message.prompt)
+        .processWithLLM(message.tabId, message.prompt, message.streamId)
         .then((result) => sendResponse({ success: true, result }))
         .catch((error) => {
           const clientError = toClientError(error);
@@ -331,6 +343,13 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const clientError = toClientError(error);
           sendResponse({ success: false, error: clientError.message, errorKind: clientError.kind, errorProvider: clientError.provider });
         });
+      return true;
+
+    case 'clearThread':
+      agent
+        .clearThread(message.tabId)
+        .then(() => sendResponse({ success: true }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
       return true;
   }
 });

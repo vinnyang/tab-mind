@@ -1,4 +1,5 @@
 import { StateGraph, START, END, Send } from "@langchain/langgraph/web";
+import type { BaseCheckpointSaver } from "@langchain/langgraph/web";
 import { AgentState, type AgentStateT } from "./state.js";
 import { splitNode } from "./nodes/split.js";
 import { summarizeChunkNode } from "./nodes/summarizeChunk.js";
@@ -16,16 +17,16 @@ function fanOut(s: AgentStateT) {
   return s.chunks.map((chunk, i) => new Send("summarizeChunk", { chunk, i }));
 }
 
-export function buildGraph() {
-  return new StateGraph(AgentState)
+export function buildGraph(checkpointer?: BaseCheckpointSaver, onToken?: (token: string) => void) {
+  const graph = new StateGraph(AgentState)
     .addNode("split", splitNode)
     .addNode("summarizeChunk", summarizeChunkNode)
     .addNode("extract", extractNode)
-    .addNode("answer", answerNode)
+    .addNode("answer", (state) => answerNode(state, onToken))
     .addConditionalEdges(START, routeStart, ["split", "extract"])
     .addConditionalEdges("split", fanOut, ["summarizeChunk"])
     .addEdge("summarizeChunk", "extract")
     .addEdge("extract", "answer")
-    .addEdge("answer", END)
-    .compile();
+    .addEdge("answer", END);
+  return checkpointer ? graph.compile({ checkpointer }) : graph.compile();
 }
