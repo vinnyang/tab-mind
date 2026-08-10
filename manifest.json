@@ -3,7 +3,7 @@
   "name": "TabMind - Local Browser Agent",
   "version": "1.0",
   "description": "Provides context to local LLMs from browser tabs with chat interface",
-  "permissions": ["activeTab", "tabs", "storage", "<all_urls>"],
+  "permissions": ["activeTab", "storage"],
   "background": { "scripts": ["dist/background.js"], "persistent": false },
   "content_scripts": [{ "matches": ["<all_urls>"], "js": ["dist/content.js"] }],
   "sidebar_action": {
@@ -15,5 +15,6 @@
     "default_title": "TabMind - Local Browser Agent",
     "default_icon": "icon.svg"
   },
-  "icons": { "48": "icon.svg", "96": "icon.svg" }
+  "icons": { "48": "icon.svg", "96": "icon.svg" },
+  "content_security_policy": "script-src 'self'; object-src 'self'; img-src 'self' data:; connect-src 'self' http://localhost:1234 http://localhost:8080 http://localhost:11434 https://openrouter.ai https://opencode.ai https://ollama.com"
 }
