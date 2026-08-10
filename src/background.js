@@ -47,7 +47,7 @@ class TabMindAgent {
     browser.storage.local.set({ llmSettings: settings });
   }
 
-  async autoDetectModels() {
+  async autoDetectModels(throwOnError = false) {
     let provider =
       this.llmSettings.provider ||
       this.llmSettings.service ||
@@ -93,8 +93,11 @@ class TabMindAgent {
         detectedModels = [data.model];
       }
     } catch (e) {
-      if (e instanceof LlmError) throw e;
-      throw new LlmError(classifyFetchError(e), fetchErrorMessage(e), provider);
+      if (throwOnError) {
+        if (e instanceof LlmError) throw e;
+        throw new LlmError(classifyFetchError(e), fetchErrorMessage(e), provider);
+      }
+      return [];
     }
 
     if (detectedModels.length) {
@@ -337,7 +340,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'detectModels':
       agent
-        .autoDetectModels()
+        .autoDetectModels(true)
         .then((models) => sendResponse({ success: true, models }))
         .catch((error) => {
           const clientError = toClientError(error);
