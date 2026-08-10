@@ -201,6 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 
     updateClearChatButton();
+
+    return messageDiv;
   }
 
   function updateSuggestions(hasSelection) {
@@ -347,6 +349,25 @@ document.addEventListener('DOMContentLoaded', () => {
   async function queryLLM(prompt) {
     if (isRequestInProgress) return null;
     isRequestInProgress = true;
+
+    const streamId = `s${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    let streamBubble = null;
+    let streamText = '';
+
+    const onToken = (message) => {
+      if (message.action !== 'llmToken' || message.streamId !== streamId) return;
+      if (!streamBubble) {
+        setLoadingState(false);
+        streamBubble = addMessage('', 'assistant', { enableCopy: false });
+      }
+      streamText += message.token;
+      const body = streamBubble.querySelector('.message-content') || streamBubble;
+      body.innerHTML = renderMarkdown(streamText);
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    };
+
+    browser.runtime.onMessage.addListener(onToken);
+
     try {
       setLoadingState(true);
       const tab = await getCurrentTab();
@@ -354,20 +375,25 @@ document.addEventListener('DOMContentLoaded', () => {
         action: 'queryLLM',
         tabId: tab.id,
         prompt: prompt,
+        streamId,
       });
 
       if (response.success) {
+        if (streamBubble) streamBubble.remove();
         addMessage(response.result, 'assistant');
         return response.result;
       } else {
+        if (streamBubble) streamBubble.remove();
         addMessage(`Error: ${friendlyErrorKind(response.errorKind, response.error)}`, 'error');
         return null;
       }
     } catch (error) {
       console.error('LLM query failed:', error);
+      if (streamBubble) streamBubble.remove();
       addMessage(`Error: ${error.message}`, 'error');
       return null;
     } finally {
+      browser.runtime.onMessage.removeListener(onToken);
       isRequestInProgress = false;
       setLoadingState(false);
     }
@@ -515,7 +541,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (elements.clearChatBtn) {
-    elements.clearChatBtn.addEventListener('click', () => {
+    elements.clearChatBtn.addEventListener('click', async () => {
+      if (isRequestInProgress) return;
+      try {
+        const tab = await getCurrentTab();
+        await browser.runtime.sendMessage({ action: 'clearThread', tabId: tab.id });
+      } catch (error) {
+        console.error('Failed to clear thread:', error);
+      }
       elements.chatMessages.innerHTML = '';
       const initialGreeting =
         'Hello! I can help you analyze this page using your local LLM. Try one of the suggestions below or type your own question.';

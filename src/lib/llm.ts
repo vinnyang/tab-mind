@@ -207,7 +207,6 @@ export async function streamModel(opts: StreamOptions): Promise<string> {
       if (!line.startsWith("data:")) continue;
       const data = line.slice(5).trim();
       if (data === "[DONE]") {
-        opts.onToken?.("");
         return full;
       }
       try {
