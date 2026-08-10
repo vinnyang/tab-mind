@@ -1,6 +1,6 @@
 {
   "name": "tab-mind",
-  "version": "1.1.0-3",
+  "version": "1.1.0-4",
   "description": "TabMind Browser Agent with LangGraph.js",
   "scripts": {
     "build": "vite build",
