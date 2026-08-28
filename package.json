@@ -12,9 +12,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.3.0",
     "typescript": "^7.0.2",
-    "vite": "^8.2.0",
+    "vite": "^8.2.2",
     "vitest": "^4.1.11"
   }
 }
